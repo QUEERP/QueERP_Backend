@@ -82,7 +82,19 @@ const purchaseReportRoutes = require("./routes/purchase/purchaseReport.routes");
 
 const app = express();
 
-app.use(cors());
+app.use(
+  cors({
+    origin: [
+      "https://que-erp-frontend-uat.vercel.app",
+      "https://que-erp-frontend.vercel.app",
+    ],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+  })
+);
+
+app.options("*", cors());
 app.use(express.json());
 
 // ── Core Routes ───────────────────────────────────────────────────────────────
