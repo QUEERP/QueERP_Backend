@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Payslip" ADD COLUMN     "overtimePay" DOUBLE PRECISION NOT NULL DEFAULT 0;

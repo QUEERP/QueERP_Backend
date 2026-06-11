@@ -1,0 +1,57 @@
+services:
+  - type: web
+    name: your-app-name
+    env: node
+    buildCommand: apt-get install -y google-chrome-stable && npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PUPPETEER_EXECUTABLE_PATH
+        value: /usr/bin/google-chrome-stable
+      - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
+        value: true
+```
+
+> Replace `server.js` with your actual entry file name (e.g. `app.js`, `index.js`)
+
+---
+
+## Step 4 — Render Dashboard Settings
+
+Go to your Render service → **Settings** tab and update:
+
+| Field | Value |
+|---|---|
+| **Build Command** | `apt-get install -y google-chrome-stable && npm install` |
+| **Start Command** | `node server.js` |
+
+Then go to **Environment** tab and add:
+
+| Key | Value |
+|---|---|
+| `PUPPETEER_EXECUTABLE_PATH` | `/usr/bin/google-chrome-stable` |
+| `PUPPETEER_SKIP_CHROMIUM_DOWNLOAD` | `true` |
+| `NODE_ENV` | `production` |
+
+---
+
+## Step 5 — Deploy & Check Logs
+
+In Render dashboard click **Manual Deploy → Deploy latest commit**, then watch logs for:
+
+- ✅ `google-chrome-stable` installing during build
+- ❌ If you see `error while loading shared libraries` → reply here with that error, different fix needed
+
+---
+
+## Your folder structure should look like:
+```
+your-project/
+├── render.yaml           ← NEW (Step 3)
+├── server.js             (your entry file)
+├── package.json          (Step 1)
+├── utils/
+│   └── generatePdf.js    ← UPDATED (Step 2)
+└── templates/
+    └── invoiceTemplate.js

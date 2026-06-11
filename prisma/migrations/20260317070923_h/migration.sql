@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Payslip" ADD COLUMN     "loanDeduction" DOUBLE PRECISION NOT NULL DEFAULT 0;
