@@ -87,10 +87,11 @@ app.use(
     origin: [
       "https://que-erp-frontend-uat.vercel.app",
       "https://que-erp-frontend.vercel.app",
+      "http://localhost:3000"
     ],
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true,
+    credentials: true
   })
 );
 
