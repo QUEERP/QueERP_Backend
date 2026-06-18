@@ -79,7 +79,10 @@ const createInvoice = async (businessId, userId, userEmail, data) => {
         rate: Number(orig.rate || item.price),
         amount: item.total, // backward compatibility mapping
         totalTax: item.total * (item.taxPercent / (100 + item.taxPercent)), // approximate tax amount in total
-        totalAmount: item.total
+        totalAmount: item.total,
+        cgstPercent: Number(orig.cgstPercent || item.cgstPercent || 0),
+        sgstPercent: Number(orig.sgstPercent || item.sgstPercent || 0),
+        igstPercent: Number(orig.igstPercent || item.igstPercent || 0)
       };
       // Remove any leftover productId field
       delete base.productId;
@@ -178,6 +181,9 @@ const convertSalesOrderToInvoice = async (businessId, userId, userEmail, salesOr
         hsnSacCode: item.hsnSacCode,
         quantity: item.quantity,
         taxPercent: item.taxPercent,
+        cgstPercent: Number(item.cgstPercent || 0),
+        sgstPercent: Number(item.sgstPercent || 0),
+        igstPercent: Number(item.igstPercent || 0),
         taxDetails: item.taxDetails || [],
         discount: item.discount || 0,
         hours: 0,
@@ -287,7 +293,10 @@ const updateInvoice = async (businessId, userId, userEmail, invoiceId, data) => 
           rate: Number(orig.rate || item.price),
           amount: item.total,
           totalTax: item.total * (item.taxPercent / (100 + item.taxPercent)),
-          totalAmount: item.total
+          totalAmount: item.total,
+          cgstPercent: Number(orig.cgstPercent || item.cgstPercent || 0),
+          sgstPercent: Number(orig.sgstPercent || item.sgstPercent || 0),
+          igstPercent: Number(orig.igstPercent || item.igstPercent || 0)
         };
         // Remove productId field regardless of its value
         delete base.productId;
