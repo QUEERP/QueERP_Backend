@@ -6,8 +6,12 @@ const { createStockMovement } = require("../inventory/movement.service");
 
 /**
  * Deducts stock from physical inventory upon dispatch (invoice creation)
+ * Returns the total COGS and Gross Profit for the invoice.
  */
 const deductStock = async (tx, businessId, items, isFromReservation = false) => {
+  let totalCogs = 0;
+  let totalGrossProfit = 0;
+
   for (const item of items) {
     if (!item.productId) continue;
 
@@ -20,18 +24,41 @@ const deductStock = async (tx, businessId, items, isFromReservation = false) => 
 
     if (stockRecord) {
       const reservedQtyDelta = isFromReservation ? -Math.min(stockRecord.reservedQty, item.quantity) : 0;
-      await createStockMovement(tx, {
+      const movement = await createStockMovement(tx, {
         businessId,
         productId: item.productId,
         warehouseId: stockRecord.warehouseId,
         quantity: -item.quantity,
         type: "SALE_OUT",
         referenceType: "INVOICE",
+        referenceId: item.invoiceId || null,
         notes: "Auto-deducted upon sales invoice creation",
         reservedQtyDelta
       });
+
+      if (item.id) {
+        const cogsAmount = movement.cogsAmount || 0;
+        const grossProfit = (item.totalAmount || item.amount || 0) - cogsAmount;
+        const grossMarginPercent = (item.totalAmount || item.amount) > 0 ? (grossProfit / (item.totalAmount || item.amount)) * 100 : 0;
+        
+        await tx.invoiceItem.update({
+          where: { id: item.id },
+          data: {
+             cogsAmount: cogsAmount,
+             unitCost: movement.unitCost,
+             valuationMethodUsed: movement.valuationMethodUsed,
+             grossProfit: grossProfit,
+             grossMarginPercent: grossMarginPercent
+          }
+        });
+
+        totalCogs += cogsAmount;
+        totalGrossProfit += grossProfit;
+      }
     }
   }
+
+  return { totalCogs, totalGrossProfit };
 };
 
 /**
@@ -56,7 +83,9 @@ const restoreStock = async (tx, businessId, items) => {
         quantity: item.quantity,
         type: "RETURN_IN",
         referenceType: "INVOICE",
-        notes: "Restored upon invoice cancellation/deletion"
+        referenceId: item.invoiceId || null,
+        notes: "Restored upon invoice cancellation/deletion",
+        unitCost: item.unitCost || 0 // Restore at the same cost it was deducted if possible
       });
     }
   }
@@ -128,7 +157,15 @@ const createInvoice = async (businessId, userId, userEmail, data) => {
     });
 
     // 5. Deduct Stock immediately from physical inventory
-    await deductStock(tx, businessId, pricing.processedItems, false);
+    const { totalCogs, totalGrossProfit } = await deductStock(tx, businessId, invoice.items, false);
+
+    await tx.invoice.update({
+      where: { id: invoice.id },
+      data: {
+        totalCogs,
+        totalGrossProfit
+      }
+    });
 
     // 6. Log & Notify
     await logAction(tx, {
@@ -229,7 +266,15 @@ const convertSalesOrderToInvoice = async (businessId, userId, userEmail, salesOr
     });
 
     // 5. Deduct Stock, recognizing it was previously reserved by Sales Order
-    await deductStock(tx, businessId, processedItems, true);
+    const { totalCogs, totalGrossProfit } = await deductStock(tx, businessId, invoice.items, true);
+
+    await tx.invoice.update({
+      where: { id: invoice.id },
+      data: {
+        totalCogs,
+        totalGrossProfit
+      }
+    });
 
     // 6. Complete Sales Order Fulfill Status
     await tx.salesOrder.update({
@@ -311,9 +356,7 @@ const updateInvoice = async (businessId, userId, userEmail, invoiceId, data) => 
         where: { invoiceId }
       });
 
-      // Deduct new physical stock
-      await deductStock(tx, businessId, pricing.processedItems, false);
-
+      // Since items are recreated we can't deduct stock yet until invoice is updated
       pricing.processedItems = processedItems;
     }
 
@@ -347,6 +390,14 @@ const updateInvoice = async (businessId, userId, userEmail, invoiceId, data) => 
         customer: true
       }
     });
+
+    if (data.items) {
+      const { totalCogs, totalGrossProfit } = await deductStock(tx, businessId, updated.items, false);
+      await tx.invoice.update({
+        where: { id: updated.id },
+        data: { totalCogs, totalGrossProfit }
+      });
+    }
 
     await logAction(tx, {
       businessId,

@@ -107,6 +107,7 @@ model Business {
   products            Product[]
   purchaseOrders      PurchaseOrder[]
   timeEntries         TimeEntry[]
+  inventoryLayers     InventoryLayer[]
 
     @@map("businesses")
 }
@@ -364,6 +365,8 @@ model Customer {
     totalTax Float @default(0) 
     discount Float @default(0)
     grandTotal Float @default(0)
+    totalCogs Float? @default(0)
+    totalGrossProfit Float? @default(0)
     
      //Business//
     createdAt     DateTime      @default(now())
@@ -425,6 +428,12 @@ salesOrder   SalesOrder? @relation(fields: [salesOrderId], references: [id])
   totalTax    Float   @default(0)
   totalAmount Float   @default(0)
     amount  Float 
+
+    unitCost            Float?   @default(0)
+    cogsAmount          Float?   @default(0)
+    grossProfit         Float?   @default(0)
+    grossMarginPercent  Float?   @default(0)
+    valuationMethodUsed String?
 
     productId    String?
     product      Product? @relation(fields: [productId], references: [id])
@@ -497,6 +506,7 @@ model Settings {
   currency          String   @default("INR")
   currencySymbol    String   @default("₹")
   invoiceTemplate   String   @default("modern")
+  valuationMethod   String   @default("FIFO")
   busniess          Business @relation(fields: [businessId], references: [id])
   users             User[]   @relation("SettingsToUser")
 }
@@ -1490,6 +1500,7 @@ model Product {
   invoiceItems  InvoiceItem[]
   salesReturnItems SalesReturnItem[]
   recurringInvoiceItems RecurringInvoiceItem[]
+  inventoryLayers InventoryLayer[]
 
   @@index([businessId])
 }
@@ -1531,6 +1542,7 @@ model Warehouse {
 
   business   Business @relation(fields: [businessId], references: [id])
   salesReturnItems SalesReturnItem[]
+  inventoryLayers InventoryLayer[]
 }
 
 model Stock {
@@ -1543,6 +1555,7 @@ model Stock {
   reservedQty Float    @default(0)
   damagedQty  Float    @default(0)
   incomingQty Float    @default(0)
+  averageCost Float    @default(0)
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -2272,6 +2285,8 @@ model StockMovement {
   invoiceId     String?
   referenceNo   String?
   salesOrderId  String?
+  unitCost      Float?
+  valuationMethod String?
   createdAt     DateTime @default(now())
 
   business      Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
@@ -2583,4 +2598,27 @@ enum PurchaseReturnStatus {
   SHIPPED
   COMPLETED
   CANCELLED
+}
+model InventoryLayer {
+  id              String   @id @default(uuid())
+  businessId      String
+  productId       String
+  warehouseId     String
+  quantity        Float
+  remainingQty    Float
+  unitCost        Float
+  transactionDate DateTime @default(now())
+  referenceType   String
+  referenceId     String?
+  isDepleted      Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  business        Business  @relation(fields: [businessId], references: [id])
+  product         Product   @relation(fields: [productId], references: [id])
+  warehouse       Warehouse @relation(fields: [warehouseId], references: [id])
+
+  @@index([businessId])
+  @@index([productId, warehouseId, isDepleted])
+  @@map("inventory_layers")
 }
