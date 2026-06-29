@@ -86,12 +86,21 @@ const app = express();
 
 app.use(cors({
   origin: function (origin, callback) {
+    // Allow all origins (development, uat, production)
     callback(null, true);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-business-id', 'Accept', 'Origin', 'X-Requested-With']
 }));
+
+app.use((req, res, next) => {
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204);
+  }
+  next();
+});
+
 app.use(express.json());
 
 // ── Core Routes ───────────────────────────────────────────────────────────────
