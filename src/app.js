@@ -16,6 +16,7 @@ const creditNoteRoutes = require("./routes/creditNoteRoutes");
 const moduleRoutes = require("./routes/module.routes");
 const customerLedgerRoutes = require("./routes/customerLedgerRoutes");
 const employeeRoutes = require("./routes/employeeRoutes");
+const attendanceRoutes = require("./routes/attendanceRoutes");
 const payrollRoutes = require("./routes/payrollRoutes");
 const leaveRoutes = require("./routes/leaveRoutes");
 const bankChangeRoutes = require("./routes/bankChangeRoutes");
@@ -42,6 +43,7 @@ const journalEntryRoutes = require("./routes/journalRoutes");
 const reportRoutes = require("./routes/reportRoutes");
 const projectRoutes = require("./routes/projectRoutes");
 const taskRoutes = require("./routes/taskRoutes");
+
 const timesRoutes = require("./routes/timesRoutes");
 const invoiceMetaRoutes = require("./routes/invoiceMeta.routes");
 
@@ -102,6 +104,7 @@ app.use("/api/credit-notes", creditNoteRoutes);
 app.use("/api/modules", moduleRoutes);
 app.use("/api/ledger", customerLedgerRoutes);
 app.use("/api/employees", employeeRoutes);
+app.use("/api/attendance", attendanceRoutes);
 app.use("/api/payrolls", payrollRoutes);
 app.use("/api/leaves", leaveRoutes);
 app.use("/api/bankchanges", bankChangeRoutes);
@@ -177,3 +180,5 @@ app.use((err, req, res, next) => {
 });
 
 module.exports = app;
+
+// trigger restart

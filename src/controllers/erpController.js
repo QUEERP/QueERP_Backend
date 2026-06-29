@@ -102,31 +102,27 @@ class ErpController {
   static async getGRNs(req, res) {
     try {
       const businessId = req.business.id;
-      const grns = await prisma.goods_receive_notes.findMany({
+      const grns = await prisma.goodsReceiveNote.findMany({
         where: { businessId },
         include: {
-          Vendor: true,
-          PurchaseOrder: true,
-          Warehouse: true,
-          goods_receive_note_items: {
+          vendor: true,
+          purchaseOrder: true,
+          warehouse: true,
+          items: {
             include: {
-              Product: true
+              product: true
             }
           }
         },
         orderBy: { createdAt: "desc" }
       });
 
-      // Map to frontend expected names (e.g. Vendor -> vendor)
+      // Map items to include quantityReceived alias
       const formattedGrns = grns.map(g => ({
         ...g,
-        vendor: g.Vendor,
-        purchaseOrder: g.PurchaseOrder,
-        warehouse: g.Warehouse,
-        items: g.goods_receive_note_items.map(it => ({
+        items: g.items.map(it => ({
           ...it,
-          product: it.Product,
-          quantityReceived: it.quantity
+          quantityReceived: it.quantityReceived
         }))
       }));
 
@@ -145,15 +141,15 @@ class ErpController {
       const { id } = req.params;
       const businessId = req.business.id;
 
-      const grn = await prisma.goods_receive_notes.findFirst({
+      const grn = await prisma.goodsReceiveNote.findFirst({
         where: { id, businessId },
         include: {
-          Vendor: true,
-          PurchaseOrder: true,
-          Warehouse: true,
-          goods_receive_note_items: {
+          vendor: true,
+          purchaseOrder: true,
+          warehouse: true,
+          items: {
             include: {
-              Product: true
+              product: true
             }
           }
         }
@@ -163,19 +159,7 @@ class ErpController {
         return res.status(404).json({ success: false, message: "GRN not found" });
       }
 
-      const formattedGrn = {
-        ...grn,
-        vendor: grn.Vendor,
-        purchaseOrder: grn.PurchaseOrder,
-        warehouse: grn.Warehouse,
-        items: grn.goods_receive_note_items.map(it => ({
-          ...it,
-          product: it.Product,
-          quantityReceived: it.quantity
-        }))
-      };
-
-      return res.json({ success: true, grn: formattedGrn });
+      return res.json({ success: true, grn });
     } catch (error) {
       return res.status(500).json({ success: false, message: error.message });
     }
@@ -189,9 +173,7 @@ class ErpController {
       const { id } = req.params;
       const businessId = req.business.id;
 
-      // In a real app, you would also reverse stock changes here.
-      // For now, just delete the record.
-      await prisma.goods_receive_notes.deleteMany({
+      await prisma.goodsReceiveNote.deleteMany({
         where: { id, businessId }
       });
 

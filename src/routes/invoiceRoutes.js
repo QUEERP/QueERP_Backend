@@ -86,6 +86,14 @@ router.post(
 );
 
 // ── Update ─────────────────────────────────────────────────────────────────
+router.put(
+  "/:id",
+  businessMiddleware,
+  checkBusinessSubscription,
+  checkPermission("invoice", "update"),
+  updateInvoice
+);
+
 router.patch(
   "/:id",
   businessMiddleware,

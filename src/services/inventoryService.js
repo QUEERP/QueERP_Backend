@@ -37,9 +37,8 @@ class InventoryService {
         type,
         quantity: Number(quantity),
         balanceAfter: stock.quantity,
-        purchaseOrderId: reference.purchaseOrderId || null,
-        billId: reference.billId || null,
-        grnId: reference.grnId || null,
+        referenceType: reference.referenceType || (reference.purchaseOrderId ? 'PURCHASE_ORDER' : (reference.billId ? 'BILL' : (reference.grnId ? 'GRN' : null))),
+        referenceId: reference.referenceId || reference.purchaseOrderId || reference.billId || reference.grnId || null,
         referenceNo: reference.referenceNo || null,
         performedBy: String(performedBy),
         notes: note || null

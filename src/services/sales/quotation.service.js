@@ -52,6 +52,9 @@ const calculatePricing = (items) => {
       quantity: qty,
       price: prc,
       taxPercent: taxRate,
+      cgstPercent: Number(item.cgstPercent || 0),
+      sgstPercent: Number(item.sgstPercent || 0),
+      igstPercent: Number(item.igstPercent || 0),
       taxDetails: item.taxDetails || [],
       discount: itemDiscount,
       total

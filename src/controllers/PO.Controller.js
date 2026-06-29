@@ -123,11 +123,10 @@ exports.getPurchaseOrders = async (req, res) => {
         businessId: req.business.id,
       },
       include: {
-        Vendor: true,
+        vendor: true,
         items: true,
-        business_users: {
-          include: { user: true },
-        },
+        assignedTo: true,
+        warehouse: true,
       },
       orderBy: {
         createdAt: "desc",
@@ -160,11 +159,10 @@ exports.getPurchaseOrderById = async (req, res) => {
         businessId: req.business.id,
       },
       include: {
-        Vendor: true,
+        vendor: true,
         items: true,
-        business_users: {
-          include: { user: true },
-        },
+        assignedTo: true,
+        warehouse: true,
       },
     });
 
@@ -214,7 +212,7 @@ exports.updatePurchaseOrder = async (req, res) => {
       where: { id },
       data: req.body,
       include: {
-        Vendor: true,
+        vendor: true,
         items: true,
       },
     });

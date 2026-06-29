@@ -22,7 +22,8 @@ const createStockMovement = async (tx, {
   damagedQtyDelta = 0,  // optional change in damagedQty
   incomingQtyDelta = 0, // optional change in incomingQty
   batchNumber = null,
-  serialNumbers = [] // array of serial number strings
+  serialNumbers = [], // array of serial number strings
+  unitCost = 0 // added unit cost
 }) => {
   // Validate basic parameters
   if (!businessId || !productId || !warehouseId || quantity === 0 || !type) {
@@ -59,6 +60,91 @@ const createStockMovement = async (tx, {
     }
   }
 
+  // Fetch product for cost tracking
+  const product = await tx.product.findUnique({
+    where: { id: productId }
+  });
+
+  // Fetch valuation method from Settings
+  const settings = await tx.settings.findUnique({ where: { businessId } });
+  const valMethod = settings?.valuationMethod || "FIFO";
+
+  let cogsAmount = 0;
+  let finalUnitCost = unitCost || (product?.costPrice || 0);
+
+  // A. Inbound Stock (Create Layer)
+  if (quantity > 0) {
+    await tx.inventoryLayer.create({
+      data: {
+        businessId,
+        productId,
+        warehouseId,
+        quantity,
+        remainingQty: quantity,
+        unitCost: finalUnitCost,
+        referenceType: referenceType || type,
+        referenceId: referenceId
+      }
+    });
+
+    if (valMethod === "WAM") {
+      const allLayers = await tx.inventoryLayer.findMany({
+        where: { businessId, productId, warehouseId, remainingQty: { gt: 0 } }
+      });
+      let totalValue = 0;
+      let totalQty = 0;
+      for (const l of allLayers) {
+        totalValue += l.remainingQty * l.unitCost;
+        totalQty += l.remainingQty;
+      }
+      const newAvgCost = totalQty > 0 ? totalValue / totalQty : 0;
+      await tx.stock.update({
+        where: { id: stockRecord.id },
+        data: { averageCost: newAvgCost }
+      });
+    }
+  }
+
+  // B. Outbound Stock (Consume Layers)
+  if (quantity < 0) {
+    let qtyToDeduct = Math.abs(quantity);
+
+    if (valMethod === "WAM") {
+      const avgCost = stockRecord.averageCost || product?.costPrice || 0;
+      cogsAmount = qtyToDeduct * avgCost;
+      finalUnitCost = avgCost;
+    }
+
+    const order = valMethod === "LIFO" ? "desc" : "asc";
+    const availableLayers = await tx.inventoryLayer.findMany({
+      where: { businessId, productId, warehouseId, remainingQty: { gt: 0 } },
+      orderBy: { transactionDate: order }
+    });
+
+    for (const layer of availableLayers) {
+      if (qtyToDeduct <= 0) break;
+      const deductFromLayer = Math.min(layer.remainingQty, qtyToDeduct);
+      qtyToDeduct -= deductFromLayer;
+
+      if (valMethod !== "WAM") {
+        cogsAmount += deductFromLayer * layer.unitCost;
+      }
+
+      const newRemaining = layer.remainingQty - deductFromLayer;
+      await tx.inventoryLayer.update({
+        where: { id: layer.id },
+        data: {
+          remainingQty: newRemaining,
+          isDepleted: newRemaining <= 0
+        }
+      });
+    }
+
+    if (qtyToDeduct > 0 && valMethod !== "WAM") {
+      cogsAmount += qtyToDeduct * (product?.costPrice || 0);
+    }
+  }
+
   // 3. Create StockMovement record
   const movement = await tx.stockMovement.create({
     data: {
@@ -70,9 +156,14 @@ const createStockMovement = async (tx, {
       referenceType,
       referenceId,
       performedBy,
-      notes
+      notes,
+      unitCost: finalUnitCost,
+      valuationMethod: valMethod
     }
   });
+
+  movement.cogsAmount = cogsAmount;
+  movement.valuationMethodUsed = valMethod;
 
   // 4. Update the Stock cache table
   const updateData = {};
@@ -97,10 +188,6 @@ const createStockMovement = async (tx, {
   }
 
   // 5. Handle Batch and Serial tracking if provided
-  const product = await tx.product.findUnique({
-    where: { id: productId }
-  });
-
   if (product) {
     // A. Batch tracking
     if (product.isBatchTracking && batchNumber) {
