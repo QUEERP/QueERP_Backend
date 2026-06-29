@@ -84,9 +84,10 @@ const purchaseReportRoutes = require("./routes/purchase/purchaseReport.routes");
 
 const app = express();
 
+// ── CORS Configuration ────────────────────────────────────────────────────────
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow all origins (development, uat, production)
+    // Allow all origins: localhost, UAT, and production Vercel deployments
     callback(null, true);
   },
   credentials: true,
@@ -94,6 +95,7 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'x-business-id', 'Accept', 'Origin', 'X-Requested-With']
 }));
 
+// Handle OPTIONS preflight requests
 app.use((req, res, next) => {
   if (req.method === "OPTIONS") {
     return res.sendStatus(204);
@@ -196,5 +198,3 @@ app.use((err, req, res, next) => {
 });
 
 module.exports = app;
-
-// trigger restart
