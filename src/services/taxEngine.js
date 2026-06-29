@@ -29,9 +29,11 @@ class TaxEngine {
       if (coState === cuState) {
         // Intra-State: CGST + SGST
         let cgstRate, sgstRate;
-        if (manualTax && manualTax.cgstRate !== undefined && manualTax.sgstRate !== undefined) {
-          cgstRate = Number(manualTax.cgstRate);
-          sgstRate = Number(manualTax.sgstRate);
+        if (manualTax && (manualTax.cgstRate !== undefined || manualTax.sgstRate !== undefined)) {
+          const rawRate = manualTax.cgstRate !== undefined ? Number(manualTax.cgstRate) : Number(manualTax.sgstRate);
+          const rate = isNaN(rawRate) ? 0 : Math.max(0, rawRate);
+          cgstRate = rate;
+          sgstRate = rate;
         } else {
           cgstRate = baseTaxPercent / 2;
           sgstRate = baseTaxPercent / 2;

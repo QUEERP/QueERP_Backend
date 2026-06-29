@@ -116,6 +116,9 @@ exports.createInvoice = async (req, res) => {
           amount: effectiveSubtotal,
           taxDetails: taxResult.breakdown,
           taxPercent: Number(item.taxPercent || 0),
+          cgstPercent: Number(item.cgstPercent || 0),
+          sgstPercent: Number(item.sgstPercent || 0),
+          igstPercent: Number(item.igstPercent || 0),
           totalTax: taxResult.totalTaxAmount,
           totalAmount: effectiveSubtotal + taxResult.totalTaxAmount,
           discount: Number(item.discount || 0)
@@ -344,42 +347,76 @@ exports.updateInvoice = async (req, res) => {
       emirate
     } = req.body;
 
+    const invoiceObj = await prisma.invoice.findUnique({
+      where: { id: invoiceId },
+    });
+
+    if (!invoiceObj) {
+      return res.status(404).json({ success: false, message: "Invoice not found" });
+    }
+
+    const customer = await prisma.customer.findFirst({
+      where: { id: invoiceObj.customerId, businessId: req.business.id },
+    });
+
+    const settings = await prisma.settings.findUnique({
+      where: { businessId: req.business.id },
+    });
+
     let subtotal = 0;
     let totalTax = 0;
 
     const newItems = items.map((i) => {
-      const amount = Number(i.hours) * Number(i.rate);
-      subtotal += amount;
+      const qty = Number(i.quantity || i.hours || 0);
+      const rate = Number(i.rate || i.price || 0);
+      const lineAmount = qty * rate;
 
-      const taxes = i.taxes || [];
-      const taxDetails = taxes.map(t => ({
-        name: t.name,
-        rate: Number(t.rate),
-        amount: (amount * Number(t.rate)) / 100,
-      }));
+      const taxResult = TaxEngine.calculateTax({
+        companyCountry: settings?.country || 'UAE',
+        companyState: settings?.state || '',
+        customerCountry: customer?.country || 'UAE',
+        customerState: customer?.state || '',
+        taxPercent: Number(i.taxPercent || 0),
+        lineSubtotal: lineAmount,
+        vatType: vatType || 'exclusive',
+        manualTax: {
+          cgstRate: i.cgstPercent,
+          sgstRate: i.sgstPercent,
+          igstRate: i.igstPercent
+        }
+      });
 
-      const itemTax = taxDetails.reduce((sum, t) => sum + t.amount, 0);
-      totalTax += itemTax;
+      const effectiveSubtotal = taxResult.effectiveSubtotal !== undefined ? taxResult.effectiveSubtotal : lineAmount;
+      subtotal += effectiveSubtotal;
+      totalTax += taxResult.totalTaxAmount;
 
       const isService = i.description && (
         i.description.toLowerCase().includes('service') ||
         i.description.toLowerCase().includes('consulting') ||
         i.description.toLowerCase().includes('development') ||
-        i.type === 'SERVICE'
+        i.itemType === 'SERVICE' || i.type === 'SERVICE'
       );
 
       return {
         invoiceId,
+        productId: i.productId || null,
+        warehouseId: i.warehouseId || null,
         description: i.description,
         hsnSacCode: i.hsnSacCode || i.taxCode || null,
         itemType: isService ? 'SERVICE' : 'GOODS',
-        hours: Number(i.hours),
-        rate: Number(i.rate),
-        amount,
-        taxDetails,
+        unit: i.unit || null,
+        hours: qty,
+        quantity: qty,
+        rate: rate,
+        amount: effectiveSubtotal,
+        taxDetails: taxResult.breakdown,
         taxPercent: Number(i.taxPercent || 0),
-        totalTax: itemTax,
-        totalAmount: amount + itemTax,
+        cgstPercent: Number(i.cgstPercent || 0),
+        sgstPercent: Number(i.sgstPercent || 0),
+        igstPercent: Number(i.igstPercent || 0),
+        totalTax: taxResult.totalTaxAmount,
+        totalAmount: effectiveSubtotal + taxResult.totalTaxAmount,
+        discount: Number(i.discount || 0)
       };
     });
 
