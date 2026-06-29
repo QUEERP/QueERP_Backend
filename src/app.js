@@ -85,25 +85,25 @@ const purchaseReportRoutes = require("./routes/purchase/purchaseReport.routes");
 
 const app = express();
 
-// ── CORS Configuration ────────────────────────────────────────────────────────
-app.use(cors({
-  origin: function (origin, callback) {
-    // Allow all origins: localhost, UAT, and production Vercel deployments
-    callback(null, true);
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-business-id', 'Accept', 'Origin', 'X-Requested-With']
-}));
+app.use(
+  cors({
+    origin: [
+      "https://que-erp-frontend-uat.vercel.app",
+      "https://que-erp-frontend.vercel.app",
+      "http://localhost:3000"
+    ],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true
+  })
+);
 
-// Handle OPTIONS preflight requests
 app.use((req, res, next) => {
   if (req.method === "OPTIONS") {
     return res.sendStatus(204);
   }
   next();
 });
-
 app.use(express.json());
 
 // ── Core Routes ───────────────────────────────────────────────────────────────
