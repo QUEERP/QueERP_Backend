@@ -57,6 +57,7 @@ model Business {
   salesOrders         SalesOrder[]
   settings            Settings?
 //   timeEntries         TimeEntry[]
+  attendances         Attendance[]
   vendors             Vendor[]
   warehouses          Warehouse[]
 //  audit_logs          audit_logs[]
@@ -609,6 +610,26 @@ model Employee {
 //   projectMembers     ProjectMember[]
 //   taskAssignees      TaskAssignee[]
   timeEntries        TimeEntry[]
+  attendances        Attendance[]
+}
+
+model Attendance {
+  id         String   @id @default(uuid())
+  businessId String
+  employeeId String
+  date       DateTime
+  status     String
+  checkIn    DateTime?
+  checkOut   DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, employeeId, date])
+  @@index([businessId, date])
+  @@map("attendances")
 }
 
 model Payslip {

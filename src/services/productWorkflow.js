@@ -43,7 +43,7 @@ class ProductWorkflow {
           productId: product.id,
           warehouseId,
           quantity: Number(initialQty),
-          type: 'ADJUSTMENT', // Initial quantity labeled as ADJUSTMENT/Opening Stock
+          type: 'OPENING_STOCK', // Initial quantity labeled as OPENING_STOCK
           reference: {
             referenceNo: "OPENING_STOCK"
           },

@@ -36,4 +36,18 @@ router.post(
   Controller.createAdjustment
 );
 
+router.get(
+  "/adjustments",
+  auth,
+  business,
+  Controller.getAdjustments
+);
+
+router.delete(
+  "/adjustments/:id",
+  auth,
+  business,
+  Controller.deleteAdjustment
+);
+
 module.exports = router;
