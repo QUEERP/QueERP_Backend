@@ -5,6 +5,8 @@ const { PrismaPg } = require("@prisma/adapter-pg");
 const { Client, Pool } = require("pg");
 const dns = require("dns");
 
+
+
 class CustomClient extends Client {
   connect(callback) {
     const originalHost = this.host;
