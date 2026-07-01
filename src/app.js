@@ -46,8 +46,9 @@ const taskRoutes = require("./routes/taskRoutes");
 
 const timesRoutes = require("./routes/timesRoutes");
 const invoiceMetaRoutes = require("./routes/invoiceMeta.routes");
+const statutoryRoutes = require("./routes/statutoryRoutes");
 
-// Phase2 (HEAD) routes
+// ── Phase2 (HEAD) routes
 const erpRoutes = require("./routes/erpRoutes");
 const purchaseRoutes = require("./routes/purchaseRoutes");
 const campaignRoutes = require("./routes/campaignRoutes");
@@ -56,12 +57,12 @@ const legacyCrmTaskRoutes = require("./routes/crmTaskRoutes");
 const noteRoutes = require("./routes/noteRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 
-// origin/main sales module routes
+// ── origin/main sales module routes
 const salesReturnRoutes = require("./routes/salesReturnRoutes");
 const recurringInvoiceRoutes = require("./routes/recurringInvoiceRoutes");
 const salesReportRoutes = require("./routes/salesReportRoutes");
 
-// Upgraded CRM Routes
+// ── Upgraded CRM Routes
 const crmNoteRoutes = require("./routes/crm/noteRoutes");
 const crmCampaignRoutes = require("./routes/crm/campaignRoutes");
 const crmEmailLogRoutes = require("./routes/crm/emailLogRoutes");
@@ -149,6 +150,7 @@ app.use("/api/projects", projectRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/time-entries", timesRoutes);
 app.use("/api/invoice-meta", invoiceMetaRoutes);
+app.use("/api/statutory", statutoryRoutes);
 
 // ── Phase2 CRM (legacy) ───────────────────────────────────────────────────────
 app.use("/api/campaigns", campaignRoutes);
