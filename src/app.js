@@ -47,7 +47,7 @@ const taskRoutes = require("./routes/taskRoutes");
 const timesRoutes = require("./routes/timesRoutes");
 const invoiceMetaRoutes = require("./routes/invoiceMeta.routes");
 const statutoryRoutes = require("./routes/statutoryRoutes");
-
+const complianceRoutes = require("./routes/complianceRoutes");
 // ── Phase2 (HEAD) routes
 const erpRoutes = require("./routes/erpRoutes");
 const purchaseRoutes = require("./routes/purchaseRoutes");
@@ -151,7 +151,7 @@ app.use("/api/tasks", taskRoutes);
 app.use("/api/time-entries", timesRoutes);
 app.use("/api/invoice-meta", invoiceMetaRoutes);
 app.use("/api/statutory", statutoryRoutes);
-
+app.use("/api/compliance", complianceRoutes);
 // ── Phase2 CRM (legacy) ───────────────────────────────────────────────────────
 app.use("/api/campaigns", campaignRoutes);
 app.use("/api/email-logs", emailLogRoutes);

@@ -127,6 +127,30 @@ exports.getNotifications = async (req, res) => {
       });
     });
 
+    // 6. Data Compliance
+    const complianceTasks = await prisma.complianceTask.groupBy({
+      by: ['modelName'],
+      where: {
+        businessId,
+        status: 'PENDING'
+      },
+      _count: {
+        id: true
+      }
+    });
+
+    complianceTasks.forEach(task => {
+      notifications.push({
+        id: `compliance-${task.modelName}`,
+        type: 'warning',
+        title: 'Data Compliance',
+        message: `${task._count.id} ${task.modelName}(s) require attention due to missing information.`,
+        link: `/dashboard/${businessId}/compliance`,
+        date: new Date().toISOString(),
+        module: 'compliance'
+      });
+    });
+
     // Sort by date descending (most urgent/recent first)
     notifications.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
