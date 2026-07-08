@@ -208,7 +208,7 @@ exports.getLoggedInUser = async (req, res) => {
     //////////////////////////////////////////////////////
     // RESPONSE
     //////////////////////////////////////////////////////
-    return successResponse(res, "User fetched successfully", user);
+    return successResponse(res, user, "User fetched successfully");
 
   } catch (error) {
     console.error(error);
@@ -222,9 +222,12 @@ exports.getLoggedInUser = async (req, res) => {
 exports.updateUser = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { email, password } = req.body;
+    const { email, password, name } = req.body;
 
     const data = {};
+    if (name && name.trim()) {
+      data.name = name.trim();
+    }
     if (email) {
       const exists = await prisma.user.findUnique({ where: { email } });
       if (exists && exists.id !== userId) {
@@ -253,7 +256,7 @@ exports.updateUser = async (req, res) => {
       }
     });
 
-    return successResponse(res, "User updated successfully", updatedUser);
+    return successResponse(res, updatedUser, "User updated successfully");
 
   } catch (error) {
     console.error("Update user error:", error);

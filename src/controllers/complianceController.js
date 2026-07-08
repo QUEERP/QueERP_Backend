@@ -3,7 +3,8 @@ const prisma = require("../config/prisma");
 
 exports.getSummary = async (req, res) => {
   try {
-    const businessId = req.business.id;
+    const businessId = req.headers["x-business-id"] || req.business?.id;
+    if (!businessId) return res.status(400).json({ success: false, message: "Missing business ID" });
     const summary = await complianceEngine.getPendingTasksSummary(businessId);
     res.json({ success: true, data: summary });
   } catch (error) {
@@ -14,7 +15,8 @@ exports.getSummary = async (req, res) => {
 
 exports.getRecordTasks = async (req, res) => {
   try {
-    const businessId = req.business.id;
+    const businessId = req.headers["x-business-id"] || req.business?.id;
+    if (!businessId) return res.status(400).json({ success: false, message: "Missing business ID" });
     const { modelName, recordId } = req.query;
 
     if (!modelName || !recordId) {
