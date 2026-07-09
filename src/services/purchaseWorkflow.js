@@ -19,11 +19,17 @@ class PurchaseWorkflow {
         throw new Error("Purchase Order not found.");
       }
 
+      let projectCostIncrement = 0;
+
       // 2. Loop through received goods and record stock increases
       for (const item of items) {
         const poItem = po.items.find(pi => pi.productId === item.productId);
         if (!poItem) {
           throw new Error(`Product ${item.productId} was not part of the original Purchase Order.`);
+        }
+
+        if (po.projectId) {
+           projectCostIncrement += (Number(item.receivedQty) * (poItem.price || 0));
         }
 
         // Call the service to increase physical counts and register StockMovement
@@ -40,6 +46,17 @@ class PurchaseWorkflow {
           performedBy,
           note: note || `Goods Receipt against PO ${po.poNumber}`,
           tx
+        });
+      }
+
+      if (po.projectId && projectCostIncrement > 0) {
+        await tx.project.update({
+          where: { id: po.projectId },
+          data: { 
+             actualCost: { increment: projectCostIncrement },
+             materialCost: { increment: projectCostIncrement },
+             committedCost: { decrement: projectCostIncrement }
+          }
         });
       }
 

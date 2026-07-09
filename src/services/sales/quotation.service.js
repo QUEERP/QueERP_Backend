@@ -264,7 +264,8 @@ const deleteQuotation = async (businessId, userId, userEmail, quotationId) => {
 const changeStatus = async (businessId, userId, userEmail, quotationId, status) => {
   return await prisma.$transaction(async (tx) => {
     const existing = await tx.quotation.findFirst({
-      where: { id: quotationId, businessId, isDeleted: false }
+      where: { id: quotationId, businessId, isDeleted: false },
+      include: { items: true } // Included to allow Project auto-detection
     });
 
     if (!existing) {
@@ -275,6 +276,47 @@ const changeStatus = async (businessId, userId, userEmail, quotationId, status) 
       where: { id: quotationId },
       data: { status }
     });
+
+    // ==========================================
+    // AUTO CREATE PROJECT ON ACCEPTANCE
+    // ==========================================
+    if (status === "ACCEPTED" || status === "APPROVED") {
+      let executionType = "SERVICE"; // Default
+      if (existing.items && existing.items.length > 0) {
+        const hasService = existing.items.some(item => item.itemType === "SERVICE" || item.itemType === "service");
+        const hasGoods = existing.items.some(item => item.itemType === "GOODS" || item.itemType === "goods" || item.itemType === "PRODUCT");
+        if (hasService && hasGoods) executionType = "HYBRID";
+        else if (hasService) executionType = "SERVICE";
+        else if (hasGoods) executionType = "PRODUCT";
+      }
+
+      const projCount = await tx.project.count({ where: { businessId } });
+      const projectCode = `PRJ-${String(projCount + 1).padStart(5, '0')}`;
+
+      const project = await tx.project.create({
+        data: {
+          businessId,
+          projectCode,
+          projectName: existing.title || `Project from ${existing.quoteNumber}`,
+          customerId: existing.customerId,
+          quotationId: existing.id,
+          executionType,
+          budget: existing.totalAmount,
+          expectedProfit: existing.totalAmount * 0.2, // Rough default mapping
+          status: "ACTIVE"
+        }
+      });
+
+      await logAction(tx, {
+        businessId,
+        userId,
+        userEmail,
+        action: "PROJECT_AUTO_CREATED",
+        entityType: "Project",
+        entityId: project.id,
+        details: { quoteNumber: existing.quoteNumber, projectCode }
+      });
+    }
 
     await logAction(tx, {
       businessId,
