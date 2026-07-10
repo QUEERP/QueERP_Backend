@@ -273,4 +273,46 @@ const membership = await prisma.businessUser.findFirst({
     });
   }
 };
-  
+
+
+//////////////////////////////////////////////////////
+// GET ALL BUSINESS USERS (FOR DROPDOWNS)
+//////////////////////////////////////////////////////
+exports.getBusinessUsersList = async (req, res) => {
+  try {
+    const { businessId } = req.params;
+
+    const memberships = await prisma.businessUser.findMany({
+      where: {
+        businessId,
+        isActive: true,
+      },
+      include: {
+        user: true,
+        role: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const usersList = memberships.map((m) => ({
+      id: m.user.id, // CRITICAL: returning the global User.id for relations
+      name: m.user.name,
+      email: m.user.email,
+      role: m.role?.name || "Member",
+      department: "General", // Placeholder as department usually lives in Employee
+      avatar: null,
+      status: m.isActive ? "Active" : "Inactive",
+    }));
+
+    return res.status(200).json({
+      success: true,
+      users: usersList,
+    });
+  } catch (error) {
+    console.error("getBusinessUsersList error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch users",
+    });
+  }
+};

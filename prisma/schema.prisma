@@ -22,6 +22,15 @@ model User {
   activeBusiness   Business?      @relation("ActiveBusiness", fields: [activeBusinessId], references: [id])
   settings         Settings[]     @relation("SettingsToUser")
 
+  // Project Operations Relations
+  projectManagerOf   Project[]            @relation("ProjectManager")
+  assignedTasks      ProjectTask[]        @relation("TaskAssignedTo")
+  assignedReqs       ProjectRequirement[]   @relation("RequirementAssignedTo")
+  milestonesOwned    ProjectMilestone[]     @relation("MilestoneOwner")
+  issuesOwned        ProjectIssue[]         @relation("IssueOwner")
+  changeRequests     ProjectChangeRequest[] @relation("ChangeRequestOwner")
+  documentsUploaded  ProjectDocument[]      @relation("DocumentUploader")
+
   @@map("users")
 }
 
@@ -113,36 +122,36 @@ model Business {
   activeUsers         User[]            @relation("ActiveBusiness")
 
   // Phase2 relations
-  Note                Note[]
-  EmailLog            EmailLog[]
-  Campaign            Campaign[]
-  CrmTask             CrmTask[]
-  LeadConversionLog   LeadConversionLog[]
-  categories          Category[]
-  brands              Brand[]
-  units               Unit[]
-  batches             Batch[]
-  serialNumbers       SerialNumber[]
-  stockTransfers      StockTransfer[]
-  stockAdjustments    StockAdjustment[]
-  purchaseRequests    PurchaseRequest[]
-  goodsReceiveNotes   GoodsReceiveNote[]
-  purchaseReturns     PurchaseReturn[]
-  salesReturns        SalesReturn[]
-  recurringInvoices   RecurringInvoice[]
-  auditLogs           AuditLog[]
-  notifications       Notification[]
-  accounts            Account[]
-  products            Product[]
-  purchaseOrders      PurchaseOrder[]
-  timeEntries         TimeEntry[]
-  inventoryLayers     InventoryLayer[]
-  complianceTasks     ComplianceTask[]
-  projects            Project[]
-  projectRequirements ProjectRequirement[]
-  projectEstimations  ProjectEstimation[]
-  projectMilestones   ProjectMilestone[]
-  projectTasks        ProjectTask[]
+  Note                  Note[]
+  EmailLog              EmailLog[]
+  Campaign              Campaign[]
+  CrmTask               CrmTask[]
+  LeadConversionLog     LeadConversionLog[]
+  categories            Category[]
+  brands                Brand[]
+  units                 Unit[]
+  batches               Batch[]
+  serialNumbers         SerialNumber[]
+  stockTransfers        StockTransfer[]
+  stockAdjustments      StockAdjustment[]
+  purchaseRequests      PurchaseRequest[]
+  goodsReceiveNotes     GoodsReceiveNote[]
+  purchaseReturns       PurchaseReturn[]
+  salesReturns          SalesReturn[]
+  recurringInvoices     RecurringInvoice[]
+  auditLogs             AuditLog[]
+  notifications         Notification[]
+  accounts              Account[]
+  products              Product[]
+  purchaseOrders        PurchaseOrder[]
+  timeEntries           TimeEntry[]
+  inventoryLayers       InventoryLayer[]
+  complianceTasks       ComplianceTask[]
+  projects              Project[]
+  projectRequirements   ProjectRequirement[]
+  projectEstimations    ProjectEstimation[]
+  projectMilestones     ProjectMilestone[]
+  projectTasks          ProjectTask[]
   projectMasters        ProjectMaster[]
   projectIssues         ProjectIssue[]
   projectChangeRequests ProjectChangeRequest[]
@@ -654,39 +663,32 @@ model CreditNote {
 }
 
 model Employee {
-  id                 String               @id @default(uuid())
-  businessId         String
-  name               String
-  email              String?
-  phone              String?
-  designation        String?
-  joinDate           DateTime?
-  basicSalary        Float
-  createdAt          DateTime             @default(now())
-  allowance          Json?
-  deduction          Json?
-  leaveBalance       Json?
-  userId             String?              @unique
-  accountHolderName  String?
-  accountNumber      String?
-  bankName           String?
-  Code               String?
-  bankChangeRequests BankChangeRequest[]
-  business           Business             @relation(fields: [businessId], references: [id])
-  user               User?                @relation(fields: [userId], references: [id])
-  leaves             Leave[]
-  loans              Loan[]
-  overtimes          Overtime[]
-  payslips           Payslip[]
-  projectManagerOf   Project[]            @relation("ProjectManager")
-  assignedTasks      ProjectTask[]        @relation("TaskAssignedTo")
-  assignedReqs          ProjectRequirement[]   @relation("RequirementAssignedTo")
-  milestonesOwned       ProjectMilestone[]     @relation("MilestoneOwner")
-  timeEntries           TimeEntry[]
-  projectIssues         ProjectIssue[]         @relation("IssueOwner")
-  projectChangeRequests ProjectChangeRequest[] @relation("ChangeRequestOwner")
-  projectDocuments      ProjectDocument[]      @relation("DocumentUploader")
+  id                    String                 @id @default(uuid())
+  businessId            String
+  name                  String
+  email                 String?
+  phone                 String?
+  designation           String?
+  joinDate              DateTime?
+  basicSalary           Float
+  createdAt             DateTime               @default(now())
+  allowance             Json?
+  deduction             Json?
+  leaveBalance          Json?
+  userId                String?                @unique
+  accountHolderName     String?
+  accountNumber         String?
+  bankName              String?
+  Code                  String?
+  bankChangeRequests    BankChangeRequest[]
+  business              Business               @relation(fields: [businessId], references: [id])
+  user                  User?                  @relation(fields: [userId], references: [id])
+  leaves                Leave[]
+  loans                 Loan[]
+  overtimes             Overtime[]
+  payslips              Payslip[]
   attendances           Attendance[]
+  timeEntries           TimeEntry[]
 }
 
 model Attendance {
@@ -996,52 +998,52 @@ model Lead {
   //////////////////////////////////////////////////////
   // NEW ENTERPRISE INQUIRY FIELDS
   //////////////////////////////////////////////////////
-  inquiryNumber       String?
-  inquiryTitle        String?
-  inquiryType         String?
-  priority            LeadPriority @default(MEDIUM)
-  department          String?
-  businessUnit        String?
-  currency            String?
-  budgetRange         String?
-  expectedRevenue     Float?
-  probability         Int?
+  inquiryNumber        String?
+  inquiryTitle         String?
+  inquiryType          String?
+  priority             LeadPriority @default(MEDIUM)
+  department           String?
+  businessUnit         String?
+  currency             String?
+  budgetRange          String?
+  expectedRevenue      Float?
+  probability          Int?
   expectedDecisionDate DateTime?
 
-  projectType         String?
-  executionType       ExecutionType @default(AUTO_DETECT)
-  expectedStartDate   DateTime?
+  projectType            String?
+  executionType          ExecutionType @default(AUTO_DETECT)
+  expectedStartDate      DateTime?
   expectedCompletionDate DateTime?
-  expectedDuration    String?
-  businessRequirement String? @db.Text
-  currentBusinessProblem String? @db.Text
-  expectedSolution    String? @db.Text
-  scopeSummary        String? @db.Text
-  deliverables        String? @db.Text
-  estimatedTeamSize   Int?
-  timezone            String?
+  expectedDuration       String?
+  businessRequirement    String?       @db.Text
+  currentBusinessProblem String?       @db.Text
+  expectedSolution       String?       @db.Text
+  scopeSummary           String?       @db.Text
+  deliverables           String?       @db.Text
+  estimatedTeamSize      Int?
+  timezone               String?
 
-  internalNotes       String? @db.Text
-  salesStrategy       String? @db.Text
-  competitors         String?
-  competitorName      String?
-  riskLevel           String?
-  winProbability      Int?
-  expectedProfit      Float?
-  expectedMargin      Float?
-  managementNotes     String? @db.Text
+  internalNotes   String? @db.Text
+  salesStrategy   String? @db.Text
+  competitors     String?
+  competitorName  String?
+  riskLevel       String?
+  winProbability  Int?
+  expectedProfit  Float?
+  expectedMargin  Float?
+  managementNotes String? @db.Text
 
-  nextFollowUpDate    DateTime?
-  reminder            Boolean @default(false)
-  meetingDate         DateTime?
-  meetingType         String?
-  meetingLocation     String?
-  followUpNotes       String? @db.Text
+  nextFollowUpDate DateTime?
+  reminder         Boolean   @default(false)
+  meetingDate      DateTime?
+  meetingType      String?
+  meetingLocation  String?
+  followUpNotes    String?   @db.Text
 
-  companySize         String?
+  companySize            String?
   preferredCommunication String?
-  industry            String?
-  gstVatNumber        String?
+  industry               String?
+  gstVatNumber           String?
 
   //////////////////////////////////////////////////////
   // CRM LEAD UPGRADES
@@ -2610,8 +2612,8 @@ model PurchaseRequest {
   createdAt     DateTime              @default(now())
   updatedAt     DateTime              @updatedAt
 
-  projectId     String?
-  project       Project?              @relation(fields: [projectId], references: [id])
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id])
 
   business  Business              @relation(fields: [businessId], references: [id], onDelete: Cascade)
   requester BusinessUser?         @relation(fields: [requesterId], references: [id], onDelete: SetNull)
@@ -2879,7 +2881,7 @@ model ProjectMaster {
   name        String
   description String?
   isActive    Boolean  @default(true)
-  config      Json?    // Added for configuring project type modules
+  config      Json? // Added for configuring project type modules
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -2914,7 +2916,7 @@ model ProjectRequirement {
   business         Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
   customer         Customer            @relation(fields: [customerId], references: [id])
   contact          CustomerContact?    @relation(fields: [contactId], references: [id])
-  assignedEmployee Employee?           @relation("RequirementAssignedTo", fields: [assignedEmployeeId], references: [id])
+  assignedEmployee User?           @relation("RequirementAssignedTo", fields: [assignedEmployeeId], references: [id])
   estimations      ProjectEstimation[]
 }
 
@@ -2943,37 +2945,37 @@ model ProjectEstimation {
 }
 
 model Project {
-  id                   String        @id @default(uuid())
-  businessId           String
-  projectCode          String        @unique
-  projectName          String
-  customerId           String
-  projectManagerId     String?
-  department           String?
-  categoryId           String?
-  typeId               String?
-  priority             String?
-  status               ProjectStatus @default(ACTIVE)
-  budget               Float         @default(0)
-  revenue              Float         @default(0)
-  expectedProfit       Float         @default(0)
-  actualCost           Float         @default(0)
+  id               String        @id @default(uuid())
+  businessId       String
+  projectCode      String        @unique
+  projectName      String
+  customerId       String
+  projectManagerId String?
+  department       String?
+  categoryId       String?
+  typeId           String?
+  priority         String?
+  status           ProjectStatus @default(ACTIVE)
+  budget           Float         @default(0)
+  revenue          Float         @default(0)
+  expectedProfit   Float         @default(0)
+  actualCost       Float         @default(0)
 
-  committedCost        Float         @default(0)
-  laborCost            Float         @default(0)
-  materialCost         Float         @default(0)
-  invoicedRevenue      Float         @default(0)
-  collectedRevenue     Float         @default(0)
+  committedCost    Float @default(0)
+  laborCost        Float @default(0)
+  materialCost     Float @default(0)
+  invoicedRevenue  Float @default(0)
+  collectedRevenue Float @default(0)
 
-  estimatedHours       Float         @default(0)
+  estimatedHours       Float     @default(0)
   startDate            DateTime?
   endDate              DateTime?
-  completionPercentage Float         @default(0)
+  completionPercentage Float     @default(0)
 
   quotationId  String?
   salesOrderId String?
 
-  executionType String?  @default("SERVICE") // SERVICE, PRODUCT, HYBRID
+  executionType String? @default("SERVICE") // SERVICE, PRODUCT, HYBRID
   billingMethod String?
   templateId    String?
 
@@ -2982,23 +2984,23 @@ model Project {
 
   business       Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
   customer       Customer         @relation(fields: [customerId], references: [id])
-  projectManager Employee?        @relation("ProjectManager", fields: [projectManagerId], references: [id])
+  projectManager User?        @relation("ProjectManager", fields: [projectManagerId], references: [id])
   quotation      Quotation?       @relation(fields: [quotationId], references: [id])
   salesOrder     SalesOrder?      @relation(fields: [salesOrderId], references: [id])
   template       ProjectTemplate? @relation(fields: [templateId], references: [id])
 
-  milestones     ProjectMilestone[]
-  tasks          ProjectTask[]
-  timeEntries    TimeEntry[]
-  invoices       Invoice[]
-  expenses       Expense[]
-  purchaseOrders PurchaseOrder[]
+  milestones       ProjectMilestone[]
+  tasks            ProjectTask[]
+  timeEntries      TimeEntry[]
+  invoices         Invoice[]
+  expenses         Expense[]
+  purchaseOrders   PurchaseOrder[]
   purchaseRequests PurchaseRequest[]
-  issues         ProjectIssue[]
-  changeRequests ProjectChangeRequest[]
-  risks          ProjectRisk[]
-  documents      ProjectDocument[]
-  meetings       ProjectMeeting[]
+  issues           ProjectIssue[]
+  changeRequests   ProjectChangeRequest[]
+  risks            ProjectRisk[]
+  documents        ProjectDocument[]
+  meetings         ProjectMeeting[]
 }
 
 model ProjectMilestone {
@@ -3018,29 +3020,29 @@ model ProjectMilestone {
 
   business Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
   project  Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  owner    Employee?     @relation("MilestoneOwner", fields: [ownerId], references: [id])
+  owner    User?     @relation("MilestoneOwner", fields: [ownerId], references: [id])
   tasks    ProjectTask[]
 }
 
 model ProjectTask {
-  id             String     @id @default(uuid())
-  businessId     String
-  projectId      String
-  milestoneId    String?
-  taskNumber     String     @unique
-  title          String
-  description    String?    @db.Text
-  priority       String?
-  status         TaskStatus @default(TODO)
-  assignedToId   String?
-  startDate      DateTime?
-  dueDate        DateTime?
-  estimatedHours Float      @default(0)
-  actualHours    Float      @default(0)
-  completionPercentage Float @default(0)
-  checklist      Json?
-  dependencies   Json?
-  assignedTeam   String?
+  id                   String     @id @default(uuid())
+  businessId           String
+  projectId            String
+  milestoneId          String?
+  taskNumber           String     @unique
+  title                String
+  description          String?    @db.Text
+  priority             String?
+  status               TaskStatus @default(TODO)
+  assignedToId         String?
+  startDate            DateTime?
+  dueDate              DateTime?
+  estimatedHours       Float      @default(0)
+  actualHours          Float      @default(0)
+  completionPercentage Float      @default(0)
+  checklist            Json?
+  dependencies         Json?
+  assignedTeam         String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -3048,60 +3050,60 @@ model ProjectTask {
   business    Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
   project     Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
   milestone   ProjectMilestone? @relation(fields: [milestoneId], references: [id])
-  assignedTo  Employee?         @relation("TaskAssignedTo", fields: [assignedToId], references: [id])
+  assignedTo  User?         @relation("TaskAssignedTo", fields: [assignedToId], references: [id])
   timeEntries TimeEntry[]
 }
 
 model ProjectIssue {
-  id          String   @id @default(uuid())
+  id          String  @id @default(uuid())
   businessId  String
   projectId   String
   title       String
-  description String?  @db.Text
+  description String? @db.Text
   priority    String?
   impact      String?
-  rootCause   String?  @db.Text
+  rootCause   String? @db.Text
   ownerId     String?
-  resolution  String?  @db.Text
-  status      String   @default("Open")
+  resolution  String? @db.Text
+  status      String  @default("Open")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
   project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  owner    Employee? @relation("IssueOwner", fields: [ownerId], references: [id])
+  owner    User? @relation("IssueOwner", fields: [ownerId], references: [id])
 }
 
 model ProjectChangeRequest {
-  id             String   @id @default(uuid())
+  id             String  @id @default(uuid())
   businessId     String
   projectId      String
   requestedById  String?
-  reason         String?  @db.Text
-  scopeChange    String?  @db.Text
+  reason         String? @db.Text
+  scopeChange    String? @db.Text
   timelineImpact String?
   costImpact     Float?
-  status         String   @default("Pending") // Pending, Approved, Rejected
+  status         String  @default("Pending") // Pending, Approved, Rejected
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   business    Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
   project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  requestedBy Employee? @relation("ChangeRequestOwner", fields: [requestedById], references: [id])
+  requestedBy User? @relation("ChangeRequestOwner", fields: [requestedById], references: [id])
 }
 
 model ProjectRisk {
-  id          String   @id @default(uuid())
+  id          String  @id @default(uuid())
   businessId  String
   projectId   String
   title       String
-  description String?  @db.Text
+  description String? @db.Text
   probability String?
   impact      String?
-  mitigation  String?  @db.Text
-  status      String   @default("Active")
+  mitigation  String? @db.Text
+  status      String  @default("Active")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -3111,7 +3113,7 @@ model ProjectRisk {
 }
 
 model ProjectDocument {
-  id           String   @id @default(uuid())
+  id           String  @id @default(uuid())
   businessId   String
   projectId    String
   title        String
@@ -3124,7 +3126,7 @@ model ProjectDocument {
 
   business   Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
   project    Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  uploadedBy Employee? @relation("DocumentUploader", fields: [uploadedById], references: [id])
+  uploadedBy User? @relation("DocumentUploader", fields: [uploadedById], references: [id])
 }
 
 model ProjectMeeting {
@@ -3134,7 +3136,7 @@ model ProjectMeeting {
   title      String
   agenda     String?  @db.Text
   date       DateTime
-  duration   Int?     // minutes
+  duration   Int? // minutes
   meetingUrl String?
   minutes    String?  @db.Text
 
@@ -3146,12 +3148,12 @@ model ProjectMeeting {
 }
 
 model ProjectTemplate {
-  id          String   @id @default(uuid())
+  id          String  @id @default(uuid())
   businessId  String
   name        String
-  description String?  @db.Text
-  config      Json?    // Stages, Task Types, Milestones, Billing Types, Execution Type config
-  isActive    Boolean  @default(true)
+  description String? @db.Text
+  config      Json? // Stages, Task Types, Milestones, Billing Types, Execution Type config
+  isActive    Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

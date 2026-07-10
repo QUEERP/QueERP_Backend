@@ -3,24 +3,31 @@ const { validateAssignments } = require("../utils/validateAssignments");
 
 exports.createProject = async (req, res) => {
   try {
-    const { name, description, businessUserIds, employeeIds } = req.body;
-
-    await validateAssignments(businessUserIds, employeeIds, req.business.id);
+    const { 
+      projectCode, projectName, customerId, projectManagerId, 
+      department, priority, status, budget, 
+      estimatedHours, startDate, endDate, executionType 
+    } = req.body;
 
     const project = await prisma.project.create({
       data: {
-        name,
-        description,
         businessId: req.business.id,
-        members: {
-          create: [
-            ...(businessUserIds || []).map(id => ({ businessUserId: id })),
-            ...(employeeIds || []).map(id => ({ employeeId: id })),
-          ],
-        },
+        projectCode: projectCode || `PRJ-${Date.now()}`,
+        projectName,
+        customerId,
+        projectManagerId,
+        department,
+        priority,
+        status: status || 'ACTIVE',
+        budget: Number(budget) || 0,
+        estimatedHours: Number(estimatedHours) || 0,
+        startDate: startDate ? new Date(startDate) : null,
+        endDate: endDate ? new Date(endDate) : null,
+        executionType,
       },
       include: {
-        members: { include: { businessUser: true, employee: true } },
+        customer: true,
+        projectManager: true
       },
     });
 
@@ -34,16 +41,20 @@ exports.createProject = async (req, res) => {
 // GET PROJECTS
 //////////////////////////////////////////////////////
 exports.getProjects = async (req, res) => {
-  const data = await prisma.project.findMany({
-    where: { businessId: req.business.id },
-    include: {
-      customer: true,
-      tasks: true,
-      timeEntries: true,
-    },
-  });
+  try {
+    const data = await prisma.project.findMany({
+      where: { businessId: req.business.id },
+      include: {
+        customer: true,
+        projectManager: true,
+      },
+      orderBy: { createdAt: 'desc' }
+    });
 
-  res.json({ success: true, projects: data });
+    res.json({ success: true, projects: data });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
 };
 
 //////////////////////////////////////////////////////

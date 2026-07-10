@@ -7,15 +7,17 @@ const getBusinessUsers = async (req, res) => {
   try {
     const businessId = req.business.id;
 
+    const excludeAdmins = req.query.excludeAdmins === "true";
+    const whereClause = { businessId };
+    
+    if (excludeAdmins) {
+      whereClause.role = {
+        name: { notIn: ["ADMIN", "SUPER_ADMIN"] }
+      };
+    }
+
     const users = await prisma.businessUser.findMany({
-      where: {
-        businessId,
-        role: {
-          name: {
-            notIn: ["ADMIN", "SUPER_ADMIN"],
-          },
-        },
-      },
+      where: whereClause,
       include: {
         user: {
           select: { id: true, name: true, email: true },
