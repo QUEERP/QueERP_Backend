@@ -27,9 +27,15 @@ model User {
   assignedTasks      ProjectTask[]        @relation("TaskAssignedTo")
   assignedReqs       ProjectRequirement[]   @relation("RequirementAssignedTo")
   milestonesOwned    ProjectMilestone[]     @relation("MilestoneOwner")
-  issuesOwned        ProjectIssue[]         @relation("IssueOwner")
+  issuesReported     ProjectIssue[]         @relation("IssueReporter")
+  issuesAssigned     ProjectIssue[]         @relation("IssueAssignee")
   changeRequests     ProjectChangeRequest[] @relation("ChangeRequestOwner")
+  changeRequestsAssigned ProjectChangeRequest[] @relation("ChangeRequestAssignee")
   documentsUploaded  ProjectDocument[]      @relation("DocumentUploader")
+  budgetApprovals  ProjectBudgetHistory[] @relation("BudgetHistoryApprover")
+
+  managedExpenses Expense[] @relation("ExpenseManager")
+  financeExpenses Expense[] @relation("ExpenseFinance")
 
   @@map("users")
 }
@@ -159,6 +165,10 @@ model Business {
   projectDocuments      ProjectDocument[]
   projectMeetings       ProjectMeeting[]
   projectTemplates      ProjectTemplate[]
+  projectBudgetHistories ProjectBudgetHistory[]
+  expenseAuditLogs      ExpenseAuditLog[]
+  invoiceAuditLogs      InvoiceAuditLog[]
+  documentAuditLogs     DocumentAuditLog[]
 
   @@map("businesses")
 }
@@ -446,6 +456,7 @@ model Invoice {
   isDeleted Boolean   @default(false)
   deletedAt DateTime?
 
+  auditLogs    InvoiceAuditLog[]
   salesReturns SalesReturn[]
   payments     Payment[]
   creditNotes  CreditNote[]
@@ -453,6 +464,19 @@ model Invoice {
   @@unique([businessId, invoiceNumber]) // invoice numbers unique per business
   @@index([businessId])
   @@map("invoices")
+}
+
+model InvoiceAuditLog {
+  id          String   @id @default(uuid())
+  businessId  String
+  invoiceId   String
+  action      String   // Created, Sent, Payment Received, Cancelled
+  performedBy String?
+  comments    String?  @db.Text
+  createdAt   DateTime @default(now())
+
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 }
 
 //   enum CreatorType {
@@ -689,6 +713,7 @@ model Employee {
   payslips              Payslip[]
   attendances           Attendance[]
   timeEntries           TimeEntry[]
+  expenses              Expense[]
 }
 
 model Attendance {
@@ -800,11 +825,42 @@ model Expense {
   date          DateTime
   notes         String?
   vendorId      String?
+  
+  status        String   @default("Draft") // Draft, Submitted, Manager Approval, Finance Approval, Reimbursed, Rejected
+  employeeId    String?
+  taskId        String?
+  department    String?
+  costCenter    String?
+  managerId     String?
+  financeId     String?
+  approvalComments String? @db.Text
+
   createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
   business      Business @relation(fields: [businessId], references: [id])
   vendor        Vendor?  @relation(fields: [vendorId], references: [id])
   projectId     String?
   project       Project? @relation(fields: [projectId], references: [id])
+  employee      Employee? @relation(fields: [employeeId], references: [id])
+  task          ProjectTask? @relation(fields: [taskId], references: [id])
+  manager       User?    @relation("ExpenseManager", fields: [managerId], references: [id])
+  finance       User?    @relation("ExpenseFinance", fields: [financeId], references: [id])
+
+  auditLogs     ExpenseAuditLog[]
+}
+
+model ExpenseAuditLog {
+  id          String   @id @default(uuid())
+  businessId  String
+  expenseId   String
+  action      String   // Created, Submitted, Approved (Manager), Approved (Finance), Reimbursed, Rejected, Edited, Deleted
+  performedBy String?
+  comments    String?  @db.Text
+  createdAt   DateTime @default(now())
+
+  expense     Expense  @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 }
 
 model Vendor {
@@ -1998,6 +2054,9 @@ model TimeEntry {
 
   description String?
   hours       Float
+  overtime    Float @default(0)
+  billable    Boolean @default(true)
+  status      String @default("DRAFT")
 
   date DateTime @default(now())
 
@@ -2982,6 +3041,8 @@ model Project {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  budgetHistories ProjectBudgetHistory[]
+
   business       Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
   customer       Customer         @relation(fields: [customerId], references: [id])
   projectManager User?        @relation("ProjectManager", fields: [projectManagerId], references: [id])
@@ -3052,46 +3113,60 @@ model ProjectTask {
   milestone   ProjectMilestone? @relation(fields: [milestoneId], references: [id])
   assignedTo  User?         @relation("TaskAssignedTo", fields: [assignedToId], references: [id])
   timeEntries TimeEntry[]
+  expenses    Expense[]
 }
 
 model ProjectIssue {
   id          String  @id @default(uuid())
   businessId  String
   projectId   String
+  issueCode   String?
   title       String
   description String? @db.Text
+  module      String?
+  severity    String?
   priority    String?
   impact      String?
   rootCause   String? @db.Text
-  ownerId     String?
+  reporterId  String?
+  assigneeId  String?
   resolution  String? @db.Text
   status      String  @default("Open")
+  dueDate     DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  owner    User? @relation("IssueOwner", fields: [ownerId], references: [id])
+  business  Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  reporter  User?     @relation("IssueReporter", fields: [reporterId], references: [id])
+  assignee  User?     @relation("IssueAssignee", fields: [assigneeId], references: [id])
 }
 
 model ProjectChangeRequest {
   id             String  @id @default(uuid())
   businessId     String
   projectId      String
+  requestNumber  String? // CR-XXXXX
+  title          String?
   requestedById  String?
+  assignedToId   String?
   reason         String? @db.Text
   scopeChange    String? @db.Text
   timelineImpact String?
   costImpact     Float?
-  status         String  @default("Pending") // Pending, Approved, Rejected
+  priority       String? @default("Medium")
+  impact         String? @default("Medium")
+  status         String  @default("Draft")
+  approvalStatus String  @default("Pending Approval") // Pending Approval, Under Review, Approved, Rejected
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   business    Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
   project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  requestedBy User? @relation("ChangeRequestOwner", fields: [requestedById], references: [id])
+  requestedBy User?     @relation("ChangeRequestOwner", fields: [requestedById], references: [id])
+  assignedTo  User?     @relation("ChangeRequestAssignee", fields: [assignedToId], references: [id])
 }
 
 model ProjectRisk {
@@ -3115,18 +3190,47 @@ model ProjectRisk {
 model ProjectDocument {
   id           String  @id @default(uuid())
   businessId   String
-  projectId    String
+  projectId    String?
   title        String
   fileUrl      String
   fileType     String?
+  fileSize     Int?    // in bytes
+  mimeType     String?
   uploadedById String?
+
+  // Extended fields
+  folder       String?  @default("General")
+  entityType   String?  // Project, Task, Milestone, Issue, Change Request, Invoice, Expense, Contract, Customer, Vendor, Employee
+  entityId     String?
+  version      Int      @default(1)
+  parentDocId  String?  // for version history
+  tags         String[]  @default([])
+  description  String?  @db.Text
+  permission   String?  @default("Owner") // Owner, Manager, Editor, Viewer, Guest
+  downloadCount Int     @default(0)
+  viewCount    Int      @default(0)
+  isArchived   Boolean  @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   business   Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  project    Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  uploadedBy User? @relation("DocumentUploader", fields: [uploadedById], references: [id])
+  project    Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  uploadedBy User?     @relation("DocumentUploader", fields: [uploadedById], references: [id])
+  auditLogs  DocumentAuditLog[]
+}
+
+model DocumentAuditLog {
+  id           String   @id @default(uuid())
+  businessId   String
+  documentId   String
+  action       String   // Uploaded, Viewed, Downloaded, Renamed, Moved, Deleted, Versioned, Shared
+  performedBy  String?
+  comments     String?  @db.Text
+  createdAt    DateTime @default(now())
+
+  document     ProjectDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  business     Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
 }
 
 model ProjectMeeting {
@@ -3160,4 +3264,24 @@ model ProjectTemplate {
 
   business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
   projects Project[]
+}
+
+model ProjectBudgetHistory {
+  id              String   @id @default(uuid())
+  businessId      String
+  projectId       String
+  oldBudget       Float
+  newBudget       Float
+  difference      Float
+  reason          String?  @db.Text
+  remarks         String?  @db.Text
+  approvedById    String?
+  effectiveDate   DateTime?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  business        Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  approvedBy      User?    @relation("BudgetHistoryApprover", fields: [approvedById], references: [id])
 }

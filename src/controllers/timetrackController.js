@@ -3,7 +3,7 @@ const { validateTimeEntry } = require("../utils/validateTimeEntry");
 
 exports.createTimeEntry = async (req, res) => {
   try {
-    const { projectId, taskId, hours, businessUserId, employeeId } = req.body;
+    const { projectId, taskId, hours, overtime, billable, status, date, description, businessUserId, employeeId } = req.body;
 
     await validateTimeEntry({
       projectId,
@@ -14,11 +14,16 @@ exports.createTimeEntry = async (req, res) => {
     const entry = await prisma.timeEntry.create({
       data: {
         projectId,
-        taskId,
+        taskId: taskId || null,
         hours: Number(hours),
+        overtime: overtime ? Number(overtime) : 0,
+        billable: billable !== undefined ? Boolean(billable) : true,
+        status: status || 'DRAFT',
+        date: date ? new Date(date) : undefined,
+        description,
         businessId: req.business.id,
-        businessUserId,
-        employeeId,
+        businessUserId: businessUserId || null,
+        employeeId: employeeId || null,
       },
     });
 
@@ -36,6 +41,12 @@ exports.createTimeEntry = async (req, res) => {
 exports.getTimeEntries = async (req, res) => {
   const entries = await prisma.timeEntry.findMany({
     where: { businessId: req.business.id },
+    include: {
+      project: { include: { projectManager: true } },
+      task: true,
+      employee: true
+    },
+    orderBy: { date: 'desc' }
   });
 
   res.json({ success: true, entries });
