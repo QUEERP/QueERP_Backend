@@ -352,19 +352,18 @@ exports.exportBudgetsExcel = async (req, res) => {
     const { search, customerId, projectManagerId, department } = req.query;
     
     let whereClause = { businessId: req.business.id };
-    if (customerId) whereClause.project = { customerId };
-    if (projectManagerId) whereClause.project = { ...whereClause.project, projectManagerId };
+    if (customerId) whereClause.customerId = customerId;
+    if (projectManagerId) whereClause.projectManagerId = projectManagerId;
     if (department) whereClause.department = { equals: department, mode: 'insensitive' };
     
     if (search) {
       whereClause.OR = [
-        { budgetCode: { contains: search, mode: 'insensitive' } },
-        { 'project.projectCode': { contains: search, mode: 'insensitive' } },
-        { 'project.projectName': { contains: search, mode: 'insensitive' } }
+        { projectCode: { contains: search, mode: 'insensitive' } },
+        { projectName: { contains: search, mode: 'insensitive' } }
       ];
     }
 
-    const budgets = await prisma.projectBudget.findMany({
+    const projects = await prisma.project.findMany({
       where: whereClause,
       include: {
         project: {
@@ -379,9 +378,9 @@ exports.exportBudgetsExcel = async (req, res) => {
       orderBy: { createdAt: 'desc' }
     });
 
-    const data = budgets.map(b => {
-      const actualCost = b.project?.expenses?.filter(e => e.status === 'APPROVED' || e.status === 'PAID').reduce((sum, e) => sum + (e.amount || 0), 0) || 0;
-      const committedCost = b.project?.purchaseOrders?.filter(po => po.status !== 'CANCELLED').reduce((sum, po) => sum + (po.totalAmount || 0), 0) || 0;
+    const data = projects.filter(p => p.budget > 0).map(b => {
+      const actualCost = b.expenses?.filter(e => e.status === 'APPROVED' || e.status === 'PAID').reduce((sum, e) => sum + (e.amount || 0), 0) || 0;
+      const committedCost = b.purchaseOrders?.filter(po => po.status !== 'CANCELLED').reduce((sum, po) => sum + (po.totalAmount || 0), 0) || 0;
       
       const utilized = actualCost + committedCost;
       const budget = b.approvedBudget || 0;
@@ -396,8 +395,8 @@ exports.exportBudgetsExcel = async (req, res) => {
       }
 
       return {
-        "Budget Code": b.budgetCode || '-',
-        "Project": b.project ? `${b.project.projectCode} - ${b.project.projectName}` : '-',
+        "Budget Code": `BUD-${b.projectCode || b.id.substring(0,6)}`,
+        "Project": `${b.projectCode} - ${b.projectName}`,
         "Customer": b.customer?.name || '-',
         "Manager": b.projectManager?.name || b.projectManager?.firstName || '-',
         "Department": b.department || '-',
@@ -420,19 +419,18 @@ exports.exportBudgetsPDF = async (req, res) => {
     const { search, customerId, projectManagerId, department } = req.query;
     
     let whereClause = { businessId: req.business.id };
-    if (customerId) whereClause.project = { customerId };
-    if (projectManagerId) whereClause.project = { ...whereClause.project, projectManagerId };
+    if (customerId) whereClause.customerId = customerId;
+    if (projectManagerId) whereClause.projectManagerId = projectManagerId;
     if (department) whereClause.department = { equals: department, mode: 'insensitive' };
     
     if (search) {
       whereClause.OR = [
-        { budgetCode: { contains: search, mode: 'insensitive' } },
-        { 'project.projectCode': { contains: search, mode: 'insensitive' } },
-        { 'project.projectName': { contains: search, mode: 'insensitive' } }
+        { projectCode: { contains: search, mode: 'insensitive' } },
+        { projectName: { contains: search, mode: 'insensitive' } }
       ];
     }
 
-    const budgets = await prisma.projectBudget.findMany({
+    const projects = await prisma.project.findMany({
       where: whereClause,
       include: {
         project: {
@@ -450,9 +448,9 @@ exports.exportBudgetsPDF = async (req, res) => {
     const headers = ['Budget Code', 'Project', 'Customer', 'Budget', 'Utilized', 'Remaining', 'Status'];
     const widths = [70, 100, 80, 60, 60, 60, 60];
     
-    const rows = budgets.map(b => {
-      const actualCost = b.project?.expenses?.filter(e => e.status === 'APPROVED' || e.status === 'PAID').reduce((sum, e) => sum + (e.amount || 0), 0) || 0;
-      const committedCost = b.project?.purchaseOrders?.filter(po => po.status !== 'CANCELLED').reduce((sum, po) => sum + (po.totalAmount || 0), 0) || 0;
+    const rows = projects.filter(p => p.budget > 0).map(b => {
+      const actualCost = b.expenses?.filter(e => e.status === 'APPROVED' || e.status === 'PAID').reduce((sum, e) => sum + (e.amount || 0), 0) || 0;
+      const committedCost = b.purchaseOrders?.filter(po => po.status !== 'CANCELLED').reduce((sum, po) => sum + (po.totalAmount || 0), 0) || 0;
       
       const utilized = actualCost + committedCost;
       const budget = b.approvedBudget || 0;
@@ -467,8 +465,8 @@ exports.exportBudgetsPDF = async (req, res) => {
       }
 
       return [
-        b.budgetCode || '-',
-        b.project?.projectName || '-',
+        `BUD-${b.projectCode || b.id.substring(0,6)}`,
+        b.projectName || '-',
         b.customer?.name || '-',
         budget.toFixed(2),
         utilized.toFixed(2),
@@ -657,7 +655,7 @@ exports.exportProfitabilityExcel = async (req, res) => {
     });
 
     const data = projects.map(p => {
-      const revenue = p.collectedRevenue || 0;
+      const revenue = p.revenue || 0;
       const cost = p.actualCost || 0;
       const profit = revenue - cost;
       const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
@@ -703,7 +701,7 @@ exports.exportProfitabilityPDF = async (req, res) => {
     const widths = [100, 80, 60, 60, 60, 50, 60];
     
     const rows = projects.map(p => {
-      const revenue = p.collectedRevenue || 0;
+      const revenue = p.revenue || 0;
       const cost = p.actualCost || 0;
       const profit = revenue - cost;
       const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
@@ -769,8 +767,8 @@ exports.exportReportExcel = async (req, res) => {
       data = projects.map(p => ({
         'Project': p.projectName, 'Code': p.projectCode, 'Customer': p.customer?.name || '-',
         'Manager': p.projectManager?.name || '-', 'Status': p.status,
-        'Budget': p.budget, 'Revenue': p.collectedRevenue, 'Cost': p.actualCost,
-        'Profit': (p.collectedRevenue || 0) - (p.actualCost || 0)
+        'Budget': p.budget, 'Revenue': p.revenue, 'Cost': p.actualCost,
+        'Profit': (p.revenue || 0) - (p.actualCost || 0)
       }));
     }
 
@@ -797,7 +795,7 @@ exports.exportReportPDF = async (req, res) => {
       const projects = await prisma.project.findMany({ where: { businessId: bId }, include: { customer: true } });
       headers = ['Project', 'Customer', 'Status', 'Budget', 'Revenue', 'Profit'];
       widths = [110, 90, 70, 60, 60, 60];
-      rows = projects.map(p => [p.projectName, p.customer?.name || '-', p.status, String(p.budget || 0), String(p.collectedRevenue || 0), String((p.collectedRevenue || 0) - (p.actualCost || 0))]);
+      rows = projects.map(p => [p.projectName, p.customer?.name || '-', p.status, String(p.budget || 0), String(p.revenue || 0), String((p.revenue || 0) - (p.actualCost || 0))]);
     }
 
     res.setHeader('Content-Disposition', `attachment; filename=Report_${reportType || 'projects'}_${new Date().toISOString().split('T')[0]}.pdf`);

@@ -4,6 +4,10 @@ const business = require("../middlewares/business.middleware");
 const Controller = require("../controllers/projectOperationsController");
 const ExportController = require("../controllers/exportController");
 
+const WarrantyController = require("../controllers/warrantyController");
+const AMCController = require("../controllers/amcController");
+const TicketController = require("../controllers/ticketController");
+
 // Middlewares
 router.use(auth);
 router.use(business);
@@ -41,6 +45,24 @@ router.post("/global/billing/workflow", Controller.updateGlobalInvoiceWorkflow);
 router.post("/global/billing/payment", Controller.addGlobalInvoicePayment);
 
 router.get("/global/profitability", Controller.getGlobalProfitability);
+
+// Warranties
+router.get("/global/warranties", WarrantyController.getWarranties);
+router.post("/global/warranties", WarrantyController.createWarranty);
+router.put("/global/warranties/:id", WarrantyController.updateWarranty);
+router.delete("/global/warranties/:id", WarrantyController.deleteWarranty);
+
+// AMCs
+router.get("/global/amcs", AMCController.getAMCs);
+router.post("/global/amcs", AMCController.createAMC);
+router.put("/global/amcs/:id", AMCController.updateAMC);
+router.delete("/global/amcs/:id", AMCController.deleteAMC);
+
+// Tickets
+router.get("/global/tickets", TicketController.getTickets);
+router.post("/global/tickets", TicketController.createTicket);
+router.put("/global/tickets/:id", TicketController.updateTicket);
+router.delete("/global/tickets/:id", TicketController.deleteTicket);
 
 // Exports
 router.get("/change-requests/export/excel", ExportController.exportChangeRequestsExcel);
