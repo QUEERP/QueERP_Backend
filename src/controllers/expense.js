@@ -49,9 +49,22 @@ exports.createExpense = async (req, res) => {
         paymentMethod,
         date: date ? new Date(date) : new Date(),
         notes,
-        vendorId
+        vendorId,
+        projectId: req.body.projectId || null
       }
     });
+
+    //////////////////////////////////////////////////////
+    // UPDATE PROJECT ACTUAL COST
+    //////////////////////////////////////////////////////
+    if (req.body.projectId) {
+      await prisma.project.update({
+        where: { id: req.body.projectId },
+        data: {
+          actualCost: { increment: amount }
+        }
+      });
+    }
 
     res.json({ success: true, data: expense });
 

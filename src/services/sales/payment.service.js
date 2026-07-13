@@ -78,6 +78,13 @@ const createPayment = async (businessId, userId, userEmail, invoiceId, data) => 
       data: { status }
     });
 
+    if (invoice.projectId) {
+      await tx.project.update({
+        where: { id: invoice.projectId },
+        data: { collectedRevenue: { increment: paymentAmount } }
+      });
+    }
+
     // 7. Log Audit & Trigger System Alert
     await logAction(tx, {
       businessId,

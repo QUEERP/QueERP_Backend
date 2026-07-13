@@ -18,6 +18,7 @@ const createPurchaseRequest = async (businessId, userId, userEmail, data) => {
       data: {
         businessId,
         requestNumber,
+        projectId: data.projectId || null,
         department: data.department || null,
         requesterId: data.requesterId || null,
         status: data.status || "DRAFT",
@@ -203,6 +204,7 @@ const convertToPurchaseOrder = async (businessId, userId, userEmail, id, vendorI
       data: {
         businessId,
         poNumber,
+        projectId: request.projectId,
         vendorId,
         warehouseId,
         status: "DRAFT",
@@ -225,6 +227,13 @@ const convertToPurchaseOrder = async (businessId, userId, userEmail, id, vendorI
       where: { id },
       data: { status: "CONVERTED_TO_PO" }
     });
+
+    if (request.projectId) {
+      await tx.project.update({
+        where: { id: request.projectId },
+        data: { committedCost: { increment: totalAmount } }
+      });
+    }
 
     await logAction(tx, {
       businessId,

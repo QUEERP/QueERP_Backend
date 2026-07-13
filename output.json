@@ -1,0 +1,59 @@
+{
+  "leads": [
+    {
+      "id": "64b564be-b1fa-4860-94fe-58c5343959d4",
+      "customerId": "5fd21c5b-0b96-498c-b4b5-cbf86264ff17",
+      "businessId": "5920d78b-e438-45f1-85d7-5943fb074fd8",
+      "inquiryNumber": "INQ-001",
+      "inquiryTitle": "rvfcd",
+      "status": "NEW",
+      "company": "Dell"
+    },
+    {
+      "id": "c6d80fc3-ba24-42d7-825d-1fa9e31b698f",
+      "customerId": "5fd21c5b-0b96-498c-b4b5-cbf86264ff17",
+      "businessId": "5920d78b-e438-45f1-85d7-5943fb074fd8",
+      "inquiryNumber": "INQ-002",
+      "inquiryTitle": "ERP Software",
+      "status": "NEW",
+      "company": "Dell"
+    },
+    {
+      "id": "7c10e134-697e-425b-9130-e051554f0d98",
+      "customerId": "5fd21c5b-0b96-498c-b4b5-cbf86264ff17",
+      "businessId": "5920d78b-e438-45f1-85d7-5943fb074fd8",
+      "inquiryNumber": "INQ-003",
+      "inquiryTitle": "Que - Legacy Inquiry",
+      "status": "NEW",
+      "company": "Que"
+    },
+    {
+      "id": "ee2c7e59-f6d5-464a-90ea-28de339b67ef",
+      "customerId": "212b3187-9ed7-48a1-b6a1-ca519256f9d3",
+      "businessId": "5920d78b-e438-45f1-85d7-5943fb074fd8",
+      "inquiryNumber": "INQ-004",
+      "inquiryTitle": "Test - Legacy Inquiry",
+      "status": "CONVERTED",
+      "company": "Test"
+    },
+    {
+      "id": "0b54ef3e-c043-4352-bdaf-c44a4346f7dd",
+      "customerId": "212b3187-9ed7-48a1-b6a1-ca519256f9d3",
+      "businessId": "5920d78b-e438-45f1-85d7-5943fb074fd8",
+      "inquiryNumber": "INQ-005",
+      "inquiryTitle": "Test - Legacy Inquiry",
+      "status": "NEW",
+      "company": "Test"
+    }
+  ],
+  "customers": [
+    {
+      "id": "5fd21c5b-0b96-498c-b4b5-cbf86264ff17",
+      "company": "Dell"
+    },
+    {
+      "id": "212b3187-9ed7-48a1-b6a1-ca519256f9d3",
+      "company": "Test"
+    }
+  ]
+}

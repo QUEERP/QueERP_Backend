@@ -4,5 +4,7 @@ const businessController = require("../controllers/businessController");
 
 router.post("/create", authMiddleware, businessController.createBusiness);
 router.get("/", authMiddleware, businessController.getMyData);
-router.get("/:id", authMiddleware, businessController.getBusinessById)
+router.get("/:id", authMiddleware, businessController.getBusinessById);
+router.get("/:businessId/users", authMiddleware, businessController.getBusinessUsersList);
+
 module.exports = router;

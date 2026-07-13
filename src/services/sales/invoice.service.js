@@ -167,6 +167,17 @@ const createInvoice = async (businessId, userId, userEmail, data) => {
       }
     });
 
+    // 5.5 Update Project Revenue
+    if (data.projectId) {
+      await tx.project.update({
+        where: { id: data.projectId },
+        data: { 
+          revenue: { increment: pricing.totalAmount },
+          invoicedRevenue: { increment: pricing.totalAmount }
+        }
+      });
+    }
+
     // 6. Log & Notify
     await logAction(tx, {
       businessId,
@@ -281,6 +292,17 @@ const convertSalesOrderToInvoice = async (businessId, userId, userEmail, salesOr
       where: { id: salesOrderId },
       data: { status: "FULFILLED" }
     });
+
+    // 6.5 Update Project Revenue if linked
+    const linkedProject = await tx.project.findFirst({
+      where: { salesOrderId: salesOrderId, businessId }
+    });
+    if (linkedProject) {
+      await tx.project.update({
+        where: { id: linkedProject.id },
+        data: { revenue: { increment: salesOrder.totalAmount } }
+      });
+    }
 
     // 7. Log & Notify
     await logAction(tx, {
