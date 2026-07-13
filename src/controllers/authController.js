@@ -236,7 +236,10 @@ exports.updateUser = async (req, res) => {
       data.email = email;
     }
     
-    if (password) {
+    if (password !== undefined) {
+      if (!password || password.length < 6) {
+        return errorResponse(res, "Password must be at least 6 characters long");
+      }
       data.password = await bcrypt.hash(password, 10);
     }
 

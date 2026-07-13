@@ -148,6 +148,7 @@ app.use("/api/accounts", accontRoutes);
 app.use("/api/journal-entries", journalEntryRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/projects", projectOperationsRoutes);
+app.use("/api/project-operations", projectOperationsRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/time-entries", timesRoutes);
 app.use("/api/invoice-meta", invoiceMetaRoutes);

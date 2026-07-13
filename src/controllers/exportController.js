@@ -352,55 +352,62 @@ exports.exportBudgetsExcel = async (req, res) => {
     const { search, customerId, projectManagerId, department } = req.query;
     
     let whereClause = { businessId: req.business.id };
-    if (customerId) whereClause.customerId = customerId;
-    if (projectManagerId) whereClause.projectManagerId = projectManagerId;
+    if (customerId) whereClause.project = { customerId };
+    if (projectManagerId) whereClause.project = { ...whereClause.project, projectManagerId };
     if (department) whereClause.department = { equals: department, mode: 'insensitive' };
     
     if (search) {
       whereClause.OR = [
-        { projectCode: { contains: search, mode: 'insensitive' } },
-        { projectName: { contains: search, mode: 'insensitive' } }
+        { budgetCode: { contains: search, mode: 'insensitive' } },
+        { 'project.projectCode': { contains: search, mode: 'insensitive' } },
+        { 'project.projectName': { contains: search, mode: 'insensitive' } }
       ];
     }
 
-    const projects = await prisma.project.findMany({
+    const budgets = await prisma.projectBudget.findMany({
       where: whereClause,
       include: {
+        project: {
+          include: {
+            expenses: { select: { amount: true, status: true } },
+            purchaseOrders: { select: { totalAmount: true, status: true } }
+          }
+        },
         customer: true,
-        projectManager: true,
-        expenses: { select: { amount: true } },
-        purchaseOrders: { select: { totalAmount: true } },
+        projectManager: true
       },
       orderBy: { createdAt: 'desc' }
     });
 
-    const data = projects.map(p => {
-      const expensesTotal = p.expenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
-      const poTotal = p.purchaseOrders.reduce((sum, po) => sum + (po.totalAmount || 0), 0);
-      const utilized = expensesTotal + poTotal + p.laborCost + p.materialCost;
+    const data = budgets.map(b => {
+      const actualCost = b.project?.expenses?.filter(e => e.status === 'APPROVED' || e.status === 'PAID').reduce((sum, e) => sum + (e.amount || 0), 0) || 0;
+      const committedCost = b.project?.purchaseOrders?.filter(po => po.status !== 'CANCELLED').reduce((sum, po) => sum + (po.totalAmount || 0), 0) || 0;
       
-      const budget = p.budget || 0;
+      const utilized = actualCost + committedCost;
+      const budget = b.approvedBudget || 0;
       const remaining = budget - utilized;
       const utilizationPercent = budget > 0 ? (utilized / budget) * 100 : 0;
       
-      let status = "On Track";
-      if (budget > 0) {
-        if (utilizationPercent > 100) status = "Over Budget";
-        else if (utilizationPercent >= 81) status = "Near Budget";
+      let computedStatus = b.status || "ACTIVE";
+      if (budget > 0 && computedStatus !== 'COMPLETED') {
+        if (utilizationPercent > 100) computedStatus = "OVER_BUDGET";
+        else if (utilizationPercent >= 81) computedStatus = "AT_RISK";
+        else computedStatus = "ON_TRACK";
       }
-      if (remaining < 0) status = "Critical";
 
       return {
-        "Project": `${p.projectCode} - ${p.projectName}`,
-        "Customer": p.customer?.name || '-',
-        "Manager": p.projectManager?.name || p.projectManager?.firstName || '-',
-        "Department": p.department || '-',
-        "Budget": budget.toFixed(2),
-        "Utilized": utilized.toFixed(2),
+        "Budget Code": b.budgetCode || '-',
+        "Project": b.project ? `${b.project.projectCode} - ${b.project.projectName}` : '-',
+        "Customer": b.customer?.name || '-',
+        "Manager": b.projectManager?.name || b.projectManager?.firstName || '-',
+        "Department": b.department || '-',
+        "Approved Budget": budget.toFixed(2),
+        "Actual Cost": actualCost.toFixed(2),
+        "Committed Cost": committedCost.toFixed(2),
         "Remaining": remaining.toFixed(2),
         "Variance": remaining.toFixed(2),
         "Utilization %": `${utilizationPercent.toFixed(2)}%`,
-        "Status": status
+        "Status": computedStatus.replace('_', ' ')
       };
     });
 
@@ -413,55 +420,60 @@ exports.exportBudgetsPDF = async (req, res) => {
     const { search, customerId, projectManagerId, department } = req.query;
     
     let whereClause = { businessId: req.business.id };
-    if (customerId) whereClause.customerId = customerId;
-    if (projectManagerId) whereClause.projectManagerId = projectManagerId;
+    if (customerId) whereClause.project = { customerId };
+    if (projectManagerId) whereClause.project = { ...whereClause.project, projectManagerId };
     if (department) whereClause.department = { equals: department, mode: 'insensitive' };
     
     if (search) {
       whereClause.OR = [
-        { projectCode: { contains: search, mode: 'insensitive' } },
-        { projectName: { contains: search, mode: 'insensitive' } }
+        { budgetCode: { contains: search, mode: 'insensitive' } },
+        { 'project.projectCode': { contains: search, mode: 'insensitive' } },
+        { 'project.projectName': { contains: search, mode: 'insensitive' } }
       ];
     }
 
-    const projects = await prisma.project.findMany({
+    const budgets = await prisma.projectBudget.findMany({
       where: whereClause,
       include: {
+        project: {
+          include: {
+            expenses: { select: { amount: true, status: true } },
+            purchaseOrders: { select: { totalAmount: true, status: true } }
+          }
+        },
         customer: true,
-        projectManager: true,
-        expenses: { select: { amount: true } },
-        purchaseOrders: { select: { totalAmount: true } },
+        projectManager: true
       },
       orderBy: { createdAt: 'desc' }
     });
 
-    const headers = ['Project', 'Customer', 'Budget', 'Utilized', 'Remaining', 'Util %', 'Status'];
-    const widths = [100, 80, 60, 60, 60, 50, 60];
+    const headers = ['Budget Code', 'Project', 'Customer', 'Budget', 'Utilized', 'Remaining', 'Status'];
+    const widths = [70, 100, 80, 60, 60, 60, 60];
     
-    const rows = projects.map(p => {
-      const expensesTotal = p.expenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
-      const poTotal = p.purchaseOrders.reduce((sum, po) => sum + (po.totalAmount || 0), 0);
-      const utilized = expensesTotal + poTotal + p.laborCost + p.materialCost;
+    const rows = budgets.map(b => {
+      const actualCost = b.project?.expenses?.filter(e => e.status === 'APPROVED' || e.status === 'PAID').reduce((sum, e) => sum + (e.amount || 0), 0) || 0;
+      const committedCost = b.project?.purchaseOrders?.filter(po => po.status !== 'CANCELLED').reduce((sum, po) => sum + (po.totalAmount || 0), 0) || 0;
       
-      const budget = p.budget || 0;
+      const utilized = actualCost + committedCost;
+      const budget = b.approvedBudget || 0;
       const remaining = budget - utilized;
       const utilizationPercent = budget > 0 ? (utilized / budget) * 100 : 0;
       
-      let status = "On Track";
-      if (budget > 0) {
-        if (utilizationPercent > 100) status = "Over Budget";
-        else if (utilizationPercent >= 81) status = "Near Budget";
+      let computedStatus = b.status || "ACTIVE";
+      if (budget > 0 && computedStatus !== 'COMPLETED') {
+        if (utilizationPercent > 100) computedStatus = "OVER_BUDGET";
+        else if (utilizationPercent >= 81) computedStatus = "AT_RISK";
+        else computedStatus = "ON_TRACK";
       }
-      if (remaining < 0) status = "Critical";
 
       return [
-        p.projectName,
-        p.customer?.name || '-',
+        b.budgetCode || '-',
+        b.project?.projectName || '-',
+        b.customer?.name || '-',
         budget.toFixed(2),
         utilized.toFixed(2),
         remaining.toFixed(2),
-        `${utilizationPercent.toFixed(2)}%`,
-        status
+        computedStatus.replace('_', ' ')
       ];
     });
 

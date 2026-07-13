@@ -9,24 +9,37 @@ router.use(auth);
 router.use(business);
 
 // Requirements
+router.get("/inquiries", Controller.getInquiriesByCustomer);
 router.post("/requirements", Controller.createRequirement);
 router.get("/requirements", Controller.getRequirements);
+router.get("/requirements/:id", Controller.getRequirementDetails);
 router.put("/requirements/:id", Controller.updateRequirement);
 
 // Estimations
 router.post("/estimations", Controller.createEstimation);
 router.get("/estimations", Controller.getEstimations);
 
+// Meetings
+router.post("/meetings", Controller.createMeeting);
+router.get("/meetings", Controller.getMeetings);
+
 // Global Routes
 router.get("/global/issues", Controller.getAllIssues);
 router.get("/global/change-requests", Controller.getAllChangeRequests);
 router.get("/global/budgets", Controller.getGlobalBudgets);
 router.post("/global/reallocate-budget", Controller.reallocateBudget);
+
+// Expenses
 router.get("/global/expenses", Controller.getGlobalExpenses);
+router.post("/global/expenses/create", Controller.createGlobalExpense);
 router.post("/global/expenses/workflow", Controller.updateGlobalExpenseWorkflow);
+
+// Billing
 router.get("/global/billing", Controller.getGlobalBilling);
+router.post("/global/billing/create", Controller.createGlobalInvoice);
 router.post("/global/billing/workflow", Controller.updateGlobalInvoiceWorkflow);
 router.post("/global/billing/payment", Controller.addGlobalInvoicePayment);
+
 router.get("/global/profitability", Controller.getGlobalProfitability);
 
 // Exports

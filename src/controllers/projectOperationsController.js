@@ -6,9 +6,93 @@ const purchaseRequestService = require("../services/purchase/purchaseRequest.ser
 // PROJECT REQUIREMENTS
 // ==========================================
 
+exports.getInquiriesByCustomer = async (req, res) => {
+  try {
+    const { customerId, status } = req.query;
+    
+    console.log("=== LINKED INQUIRIES API CALLED ===");
+    console.log({
+      customerId,
+      businessId: req.business?.id,
+      status
+    });
+
+    if (!customerId) {
+      return res.status(400).json({ success: false, message: "customerId is required" });
+    }
+
+    const customer = await prisma.customer.findFirst({
+      where: { id: customerId, businessId: req.business.id }
+    });
+
+    if (!customer) {
+      return res.status(404).json({ success: false, message: "Customer not found" });
+    }
+
+    const customerCompany = customer.company || customer.name;
+
+    const whereClause = {
+      customerId: customerId,
+      businessId: req.business.id,
+      isDeleted: false
+    };
+
+    console.log("Prisma Query Where:", whereClause);
+
+    const inquiries = await prisma.lead.findMany({
+      where: whereClause,
+      select: {
+        id: true,
+        inquiryNumber: true,
+        inquiryTitle: true,
+        status: true,
+        name: true,
+        phone: true,
+        email: true,
+        company: true,
+        description: true,
+        budgetRange: true,
+        priority: true,
+        projectType: true,
+        expectedDuration: true,
+        source: true,
+        createdAt: true
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    console.log(`=== INQUIRY QUERY RESULT: ${inquiries.length} records found ===`);
+
+    const formattedInquiries = inquiries.map(inq => ({
+      id: inq.id,
+      inquiryNo: inq.inquiryNumber,
+      title: inq.inquiryTitle || inq.name,
+      status: inq.status,
+      createdAt: inq.createdAt,
+      customerName: customerCompany,
+      // Extra fields for autofill
+      contactPerson: inq.name,
+      contactNumber: inq.phone,
+      email: inq.email,
+      company: inq.company,
+      description: inq.description,
+      estimatedBudget: inq.budgetRange,
+      priority: inq.priority,
+      projectCategory: inq.projectType,
+      expectedTimeline: inq.expectedDuration,
+      source: inq.source
+    }));
+
+    res.json({ success: true, inquiries: formattedInquiries });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 exports.createRequirement = async (req, res) => {
   try {
-    const data = req.body;
+    const { linkedInquiry, ...data } = req.body;
+    console.log("Create Requirement Request Body:", req.body);
     const reqCount = await prisma.projectRequirement.count({ where: { businessId: req.business.id } });
     const requirementNumber = `REQ-${String(reqCount + 1).padStart(5, '0')}`;
 
@@ -17,21 +101,63 @@ exports.createRequirement = async (req, res) => {
         ...data,
         requirementNumber,
         businessId: req.business.id,
+        createdBy: req.user?.id,
       },
     });
+
+    if (linkedInquiry) {
+      await prisma.lead.update({
+        where: { id: linkedInquiry },
+        data: { requirementId: requirement.id }
+      });
+    }
+
     res.json({ success: true, requirement });
   } catch (err) {
+    console.error("Create Requirement Error:", err);
     res.status(400).json({ success: false, message: err.message });
   }
 };
 
 exports.getRequirements = async (req, res) => {
   try {
+    const { customerId, status } = req.query;
+    const where = { businessId: req.business.id };
+    
+    if (customerId) {
+      where.customerId = customerId;
+    }
+    if (status) {
+      if (status.toLowerCase() === 'open') {
+        where.status = { notIn: ['Closed', 'Rejected', 'Cancelled'] };
+      } else {
+        where.status = { contains: status, mode: 'insensitive' };
+      }
+    }
+
     const requirements = await prisma.projectRequirement.findMany({
-      where: { businessId: req.business.id },
-      include: { customer: true, assignedEmployee: true },
+      where,
+      include: { customer: true, assignedEmployee: true, inquiries: true },
+      orderBy: { createdAt: 'desc' }
     });
     res.json({ success: true, requirements });
+  } catch (err) {
+    console.error("Error fetching requirements:", err);
+    res.status(500).json({ success: false, message: err.message, stack: err.stack });
+  }
+};
+
+exports.getRequirementDetails = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const requirement = await prisma.projectRequirement.findFirst({
+      where: { id, businessId: req.business.id },
+      include: { customer: true, inquiries: true, estimations: true }
+    });
+    if (!requirement) {
+      return res.status(404).json({ success: false, message: "Requirement not found" });
+    }
+    res.json({ success: true, requirement });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -60,9 +186,12 @@ exports.createEstimation = async (req, res) => {
       (data.subcontractCost || 0) + (data.travelCost || 0) + (data.miscCost || 0) +
       (data.tax || 0);
 
+    // Remove fields not in the schema
+    const { customerId, inquiry, estNumber, estName, projectType, executionType, version, preparedBy, preparedDate, currency, projPriority, projDuration, projSize, expStart, expEnd, labour, material, software, thirdParty, expenses, riskBufferPct, discountPct, markupPct, taxPct, exchangeRate, reviewedBy, approvedBy, approvalStatus, approvalNotes, linkedReq, customer, ...validData } = data;
+
     const estimation = await prisma.projectEstimation.create({
       data: {
-        ...data,
+        ...validData,
         totalCost,
         businessId: req.business.id,
       },
@@ -75,11 +204,57 @@ exports.createEstimation = async (req, res) => {
 
 exports.getEstimations = async (req, res) => {
   try {
+    const { requirementId, customerId, status } = req.query;
+    const where = { businessId: req.business.id };
+    
+    if (requirementId) {
+      where.requirementId = requirementId;
+    }
+    if (customerId) {
+      where.customerId = customerId;
+    }
+    if (status) {
+      where.status = { contains: status, mode: 'insensitive' };
+    }
+
     const estimations = await prisma.projectEstimation.findMany({
-      where: { businessId: req.business.id },
+      where,
       include: { requirement: { include: { customer: true } } },
+      orderBy: { createdAt: 'desc' }
     });
     res.json({ success: true, estimations });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.createMeeting = async (req, res) => {
+  try {
+    const data = req.body;
+    console.log("Create Meeting Request Body:", data);
+    
+    const meeting = await prisma.projectMeeting.create({
+      data: {
+        ...data,
+        businessId: req.business.id,
+        createdBy: req.user?.id,
+      },
+    });
+
+    res.json({ success: true, meeting });
+  } catch (err) {
+    console.error("Create Meeting Error:", err);
+    res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+exports.getMeetings = async (req, res) => {
+  try {
+    const meetings = await prisma.projectMeeting.findMany({
+      where: { businessId: req.business.id },
+      include: { requirement: true, customer: true },
+    });
+    res.json({ success: true, meetings });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -399,90 +574,152 @@ exports.updateChangeRequest = async (req, res) => {
 
 exports.getGlobalBudgets = async (req, res) => {
   try {
-    const projects = await prisma.project.findMany({
+    const budgets = await prisma.projectBudget.findMany({
       where: { businessId: req.business.id },
       include: {
+        project: {
+          include: {
+            expenses: { select: { amount: true, status: true } },
+            purchaseOrders: { select: { totalAmount: true, status: true } }
+          }
+        },
         customer: true,
-        projectManager: true,
-        expenses: { select: { amount: true } },
-        purchaseOrders: { select: { totalAmount: true } },
-        budgetHistories: { orderBy: { createdAt: 'desc' } }
+        projectManager: true
       },
       orderBy: { createdAt: 'desc' }
     });
 
-    const budgets = projects.map(p => {
-      const expensesTotal = p.expenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
-      const poTotal = p.purchaseOrders.reduce((sum, po) => sum + (po.totalAmount || 0), 0);
-      const utilized = expensesTotal + poTotal + p.laborCost + p.materialCost;
+    const enrichedBudgets = budgets.map(b => {
+      const actualCost = b.project?.expenses?.filter(e => e.status === 'APPROVED' || e.status === 'PAID').reduce((sum, e) => sum + (e.amount || 0), 0) || 0;
+      const committedCost = b.project?.purchaseOrders?.filter(po => po.status !== 'CANCELLED').reduce((sum, po) => sum + (po.totalAmount || 0), 0) || 0;
       
-      const budget = p.budget || 0;
-      const remaining = budget - utilized;
+      const utilized = actualCost + committedCost;
+      const remaining = (b.approvedBudget || 0) - utilized;
       const variance = remaining;
-      const utilizationPercent = budget > 0 ? (utilized / budget) * 100 : 0;
+      const utilizationPercent = b.approvedBudget > 0 ? (utilized / b.approvedBudget) * 100 : 0;
       
-      let status = "On Track";
-      if (budget > 0) {
-        if (utilizationPercent > 100) status = "Over Budget";
-        else if (utilizationPercent >= 81) status = "Near Budget";
+      let computedStatus = b.status || "ACTIVE";
+      if (b.approvedBudget > 0 && computedStatus !== 'COMPLETED') {
+        if (utilizationPercent > 100) computedStatus = "OVER_BUDGET";
+        else if (utilizationPercent >= 81) computedStatus = "AT_RISK";
+        else computedStatus = "ON_TRACK";
       }
 
-      if (remaining < 0) status = "Critical";
-
       return {
-        ...p,
-        utilizedBudget: utilized,
+        ...b,
+        actualCost,
+        committedCost,
         remainingBudget: remaining,
         variance,
         utilizationPercent: parseFloat(utilizationPercent.toFixed(2)),
-        budgetStatus: status,
+        budgetStatus: computedStatus
       };
     });
 
-    res.json({ success: true, budgets });
+    res.json({ success: true, budgets: enrichedBudgets });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(400).json({ success: false, message: err.message });
   }
 };
 
 exports.reallocateBudget = async (req, res) => {
   try {
-    const { projectId, additionalBudget, reason, effectiveDate, remarks } = req.body;
+    const { fromProjectId, toProjectId, amount, reason, effectiveDate, remarks, projectId, additionalBudget } = req.body;
     
-    if (!projectId || additionalBudget === undefined) {
-      return res.status(400).json({ success: false, message: "Project ID and Additional Budget are required." });
+    // Legacy support for single project addition/subtraction
+    if (projectId && additionalBudget !== undefined) {
+      const project = await prisma.project.findFirst({
+        where: { id: projectId, businessId: req.business.id }
+      });
+      if (!project) return res.status(404).json({ success: false, message: "Project not found." });
+
+      const oldBudget = project.budget || 0;
+      const newBudget = oldBudget + parseFloat(additionalBudget);
+
+      await prisma.$transaction([
+        prisma.projectBudgetHistory.create({
+          data: {
+            businessId: req.business.id,
+            projectId: project.id,
+            oldBudget,
+            newBudget,
+            difference: parseFloat(additionalBudget),
+            reason,
+            remarks,
+            effectiveDate: effectiveDate ? new Date(effectiveDate) : new Date(),
+            approvedById: req.user?.id
+          }
+        }),
+        prisma.project.update({
+          where: { id: project.id },
+          data: { budget: newBudget }
+        })
+      ]);
+
+      return res.json({ success: true, message: "Budget reallocated successfully." });
     }
 
-    const project = await prisma.project.findFirst({
-      where: { id: projectId, businessId: req.business.id }
-    });
+    // New Transfer logic
+    if (!fromProjectId || !toProjectId || !amount) {
+      return res.status(400).json({ success: false, message: "Source project, target project, and amount are required." });
+    }
 
-    if (!project) return res.status(404).json({ success: false, message: "Project not found." });
+    const fromProject = await prisma.project.findFirst({ where: { id: fromProjectId, businessId: req.business.id } });
+    const toProject = await prisma.project.findFirst({ where: { id: toProjectId, businessId: req.business.id } });
 
-    const oldBudget = project.budget || 0;
-    const newBudget = oldBudget + parseFloat(additionalBudget);
+    if (!fromProject || !toProject) return res.status(404).json({ success: false, message: "Project not found." });
+
+    const transferAmount = parseFloat(amount);
+    
+    const fromOldBudget = fromProject.budget || 0;
+    const fromNewBudget = fromOldBudget - transferAmount;
+    
+    // Validation
+    if (fromNewBudget < 0) {
+      return res.status(400).json({ success: false, message: "Insufficient budget in source project." });
+    }
+
+    const toOldBudget = toProject.budget || 0;
+    const toNewBudget = toOldBudget + transferAmount;
 
     await prisma.$transaction([
       prisma.projectBudgetHistory.create({
         data: {
           businessId: req.business.id,
-          projectId: project.id,
-          oldBudget,
-          newBudget,
-          difference: parseFloat(additionalBudget),
-          reason,
+          projectId: fromProject.id,
+          oldBudget: fromOldBudget,
+          newBudget: fromNewBudget,
+          difference: -transferAmount,
+          reason: reason || "Transfer Out",
           remarks,
           effectiveDate: effectiveDate ? new Date(effectiveDate) : new Date(),
           approvedById: req.user?.id
         }
       }),
       prisma.project.update({
-        where: { id: project.id },
-        data: { budget: newBudget }
+        where: { id: fromProject.id },
+        data: { budget: fromNewBudget }
+      }),
+      prisma.projectBudgetHistory.create({
+        data: {
+          businessId: req.business.id,
+          projectId: toProject.id,
+          oldBudget: toOldBudget,
+          newBudget: toNewBudget,
+          difference: transferAmount,
+          reason: reason || "Transfer In",
+          remarks,
+          effectiveDate: effectiveDate ? new Date(effectiveDate) : new Date(),
+          approvedById: req.user?.id
+        }
+      }),
+      prisma.project.update({
+        where: { id: toProject.id },
+        data: { budget: toNewBudget }
       })
     ]);
 
-    res.json({ success: true, message: "Budget reallocated successfully." });
+    res.json({ success: true, message: "Budget transferred successfully." });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -491,6 +728,30 @@ exports.reallocateBudget = async (req, res) => {
 // ==========================================
 // EXPENSES
 // ==========================================
+
+exports.createGlobalExpense = async (req, res) => {
+  try {
+    const { title, amount, category, paymentMethod, date, projectId, employeeId, notes, status } = req.body;
+    const expense = await prisma.expense.create({
+      data: {
+        businessId: req.business.id,
+        title,
+        amount: parseFloat(amount),
+        category: category || 'Other',
+        paymentMethod: paymentMethod || 'Cash',
+        date: date ? new Date(date) : new Date(),
+        projectId: projectId || null,
+        employeeId: employeeId || null,
+        notes,
+        status: status || 'Draft'
+      }
+    });
+
+    res.status(201).json({ success: true, expense });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
 
 exports.getGlobalExpenses = async (req, res) => {
   try {
@@ -579,6 +840,35 @@ exports.updateGlobalExpenseWorkflow = async (req, res) => {
 // ==========================================
 // BILLING / INVOICES
 // ==========================================
+
+exports.createGlobalInvoice = async (req, res) => {
+  try {
+    const { customerId, projectId, dueDate, amount, status } = req.body;
+    
+    // Auto-generate invoice number (simple format)
+    const invoiceNumber = `INV-${Date.now().toString().slice(-6)}`;
+    
+    const invoice = await prisma.invoice.create({
+      data: {
+        businessId: req.business.id,
+        invoiceNumber,
+        customerId: customerId || null,
+        projectId: projectId || null,
+        invoiceDate: new Date(),
+        dueDate: dueDate ? new Date(dueDate) : new Date(),
+        grandTotal: parseFloat(amount),
+        subTotal: parseFloat(amount),
+        totalTax: 0,
+        status: status || 'DRAFT',
+        terms: "Created from Global Billing",
+      }
+    });
+
+    res.status(201).json({ success: true, invoice });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
 
 exports.getGlobalBilling = async (req, res) => {
   try {

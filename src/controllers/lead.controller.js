@@ -12,6 +12,7 @@ exports.createLead = async (req, res) => {
       email,
       phone,
       company,
+      customerId,
       website,
       position,
       city,
@@ -122,6 +123,14 @@ exports.createLead = async (req, res) => {
       }
     }
 
+    let finalInquiryNumber = inquiryNumber;
+    if (type === "INQUIRY" && !finalInquiryNumber) {
+      const inqCount = await prisma.lead.count({
+        where: { businessId: req.business.id, inquiryNumber: { not: null } }
+      });
+      finalInquiryNumber = `INQ-${String(inqCount + 1).padStart(3, '0')}`;
+    }
+
     const lead = await prisma.lead.create({
       data: {
         businessId: req.business.id,
@@ -129,6 +138,7 @@ exports.createLead = async (req, res) => {
         email,
         phone,
         company,
+        customerId,
         website,
         position,
         city,
@@ -146,7 +156,7 @@ exports.createLead = async (req, res) => {
         defaultLanguage,
         score: parseInt(score) || 0,
         campaignId,
-        inquiryNumber,
+        inquiryNumber: finalInquiryNumber,
         inquiryTitle,
         inquiryType,
         priority,

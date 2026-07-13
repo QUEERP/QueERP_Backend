@@ -6,7 +6,8 @@ exports.createProject = async (req, res) => {
     const { 
       projectCode, projectName, customerId, projectManagerId, 
       department, priority, status, budget, 
-      estimatedHours, startDate, endDate, executionType 
+      estimatedHours, startDate, endDate, executionType,
+      requirementId, estimateId
     } = req.body;
 
     const project = await prisma.project.create({
@@ -30,6 +31,42 @@ exports.createProject = async (req, res) => {
         projectManager: true
       },
     });
+
+    const numBudget = Number(budget) || 0;
+    
+    // Auto-create Project Budget
+    await prisma.projectBudget.create({
+      data: {
+        budgetCode: `BUD-${project.projectCode || Date.now()}`,
+        businessId: req.business.id,
+        projectId: project.id,
+        customerId: customerId || null,
+        requirementId: requirementId || null,
+        estimateId: estimateId || null,
+        department: department || null,
+        approvedBudget: numBudget,
+        remainingBudget: numBudget,
+        status: "ACTIVE",
+        projectManagerId: projectManagerId || null,
+      }
+    });
+
+    // Create Initial Budget History
+    if (numBudget > 0) {
+      await prisma.projectBudgetHistory.create({
+        data: {
+          businessId: req.business.id,
+          projectId: project.id,
+          oldBudget: 0,
+          newBudget: numBudget,
+          difference: numBudget,
+          reason: "INITIAL_BUDGET",
+          remarks: "Auto-generated budget upon project creation",
+          approvedById: req.user.id,
+          effectiveDate: new Date()
+        }
+      });
+    }
 
     res.json({ success: true, project });
 

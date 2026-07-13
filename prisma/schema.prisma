@@ -23,19 +23,20 @@ model User {
   settings         Settings[]     @relation("SettingsToUser")
 
   // Project Operations Relations
-  projectManagerOf   Project[]            @relation("ProjectManager")
-  assignedTasks      ProjectTask[]        @relation("TaskAssignedTo")
-  assignedReqs       ProjectRequirement[]   @relation("RequirementAssignedTo")
-  milestonesOwned    ProjectMilestone[]     @relation("MilestoneOwner")
-  issuesReported     ProjectIssue[]         @relation("IssueReporter")
-  issuesAssigned     ProjectIssue[]         @relation("IssueAssignee")
-  changeRequests     ProjectChangeRequest[] @relation("ChangeRequestOwner")
+  projectManagerOf       Project[]              @relation("ProjectManager")
+  assignedTasks          ProjectTask[]          @relation("TaskAssignedTo")
+  assignedReqs           ProjectRequirement[]   @relation("RequirementAssignedTo")
+  milestonesOwned        ProjectMilestone[]     @relation("MilestoneOwner")
+  issuesReported         ProjectIssue[]         @relation("IssueReporter")
+  issuesAssigned         ProjectIssue[]         @relation("IssueAssignee")
+  changeRequests         ProjectChangeRequest[] @relation("ChangeRequestOwner")
   changeRequestsAssigned ProjectChangeRequest[] @relation("ChangeRequestAssignee")
-  documentsUploaded  ProjectDocument[]      @relation("DocumentUploader")
-  budgetApprovals  ProjectBudgetHistory[] @relation("BudgetHistoryApprover")
+  documentsUploaded      ProjectDocument[]      @relation("DocumentUploader")
+  budgetApprovals        ProjectBudgetHistory[] @relation("BudgetHistoryApprover")
 
-  managedExpenses Expense[] @relation("ExpenseManager")
-  financeExpenses Expense[] @relation("ExpenseFinance")
+  managedExpenses Expense[]       @relation("ExpenseManager")
+  financeExpenses Expense[]       @relation("ExpenseFinance")
+  projectBudgets  ProjectBudget[]
 
   @@map("users")
 }
@@ -128,47 +129,48 @@ model Business {
   activeUsers         User[]            @relation("ActiveBusiness")
 
   // Phase2 relations
-  Note                  Note[]
-  EmailLog              EmailLog[]
-  Campaign              Campaign[]
-  CrmTask               CrmTask[]
-  LeadConversionLog     LeadConversionLog[]
-  categories            Category[]
-  brands                Brand[]
-  units                 Unit[]
-  batches               Batch[]
-  serialNumbers         SerialNumber[]
-  stockTransfers        StockTransfer[]
-  stockAdjustments      StockAdjustment[]
-  purchaseRequests      PurchaseRequest[]
-  goodsReceiveNotes     GoodsReceiveNote[]
-  purchaseReturns       PurchaseReturn[]
-  salesReturns          SalesReturn[]
-  recurringInvoices     RecurringInvoice[]
-  auditLogs             AuditLog[]
-  notifications         Notification[]
-  accounts              Account[]
-  products              Product[]
-  purchaseOrders        PurchaseOrder[]
-  timeEntries           TimeEntry[]
-  inventoryLayers       InventoryLayer[]
-  complianceTasks       ComplianceTask[]
-  projects              Project[]
-  projectRequirements   ProjectRequirement[]
-  projectEstimations    ProjectEstimation[]
-  projectMilestones     ProjectMilestone[]
-  projectTasks          ProjectTask[]
-  projectMasters        ProjectMaster[]
-  projectIssues         ProjectIssue[]
-  projectChangeRequests ProjectChangeRequest[]
-  projectRisks          ProjectRisk[]
-  projectDocuments      ProjectDocument[]
-  projectMeetings       ProjectMeeting[]
-  projectTemplates      ProjectTemplate[]
+  Note                   Note[]
+  EmailLog               EmailLog[]
+  Campaign               Campaign[]
+  CrmTask                CrmTask[]
+  LeadConversionLog      LeadConversionLog[]
+  categories             Category[]
+  brands                 Brand[]
+  units                  Unit[]
+  batches                Batch[]
+  serialNumbers          SerialNumber[]
+  stockTransfers         StockTransfer[]
+  stockAdjustments       StockAdjustment[]
+  purchaseRequests       PurchaseRequest[]
+  goodsReceiveNotes      GoodsReceiveNote[]
+  purchaseReturns        PurchaseReturn[]
+  salesReturns           SalesReturn[]
+  recurringInvoices      RecurringInvoice[]
+  auditLogs              AuditLog[]
+  notifications          Notification[]
+  accounts               Account[]
+  products               Product[]
+  purchaseOrders         PurchaseOrder[]
+  timeEntries            TimeEntry[]
+  inventoryLayers        InventoryLayer[]
+  complianceTasks        ComplianceTask[]
+  projects               Project[]
+  projectRequirements    ProjectRequirement[]
+  projectEstimations     ProjectEstimation[]
+  projectMilestones      ProjectMilestone[]
+  projectTasks           ProjectTask[]
+  projectMasters         ProjectMaster[]
+  projectIssues          ProjectIssue[]
+  projectChangeRequests  ProjectChangeRequest[]
+  projectRisks           ProjectRisk[]
+  projectDocuments       ProjectDocument[]
+  projectMeetings        ProjectMeeting[]
+  projectTemplates       ProjectTemplate[]
   projectBudgetHistories ProjectBudgetHistory[]
-  expenseAuditLogs      ExpenseAuditLog[]
-  invoiceAuditLogs      InvoiceAuditLog[]
-  documentAuditLogs     DocumentAuditLog[]
+  expenseAuditLogs       ExpenseAuditLog[]
+  invoiceAuditLogs       InvoiceAuditLog[]
+  documentAuditLogs      DocumentAuditLog[]
+  projectBudgets         ProjectBudget[]
 
   @@map("businesses")
 }
@@ -360,6 +362,7 @@ model Customer {
   invoices            Invoice[]
   leadId              String?              @unique
   leads               Lead[]
+  inquiries           Lead[]               @relation("LeadToCustomer")
   creditNotes         CreditNote[]
   customerContacts    CustomerContact[]
   contracts           Contract[]
@@ -375,6 +378,8 @@ model Customer {
   leadConversionLogs  LeadConversionLog[]
   salesReturns        SalesReturn[]
   recurringInvoices   RecurringInvoice[]
+  projectMeetings     ProjectMeeting[]
+  projectBudgets      ProjectBudget[]
 
   @@index([businessId])
   @@index([accountOwnerId])
@@ -470,13 +475,13 @@ model InvoiceAuditLog {
   id          String   @id @default(uuid())
   businessId  String
   invoiceId   String
-  action      String   // Created, Sent, Payment Received, Cancelled
+  action      String // Created, Sent, Payment Received, Cancelled
   performedBy String?
   comments    String?  @db.Text
   createdAt   DateTime @default(now())
 
-  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  invoice  Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 }
 
 //   enum CreatorType {
@@ -687,33 +692,33 @@ model CreditNote {
 }
 
 model Employee {
-  id                    String                 @id @default(uuid())
-  businessId            String
-  name                  String
-  email                 String?
-  phone                 String?
-  designation           String?
-  joinDate              DateTime?
-  basicSalary           Float
-  createdAt             DateTime               @default(now())
-  allowance             Json?
-  deduction             Json?
-  leaveBalance          Json?
-  userId                String?                @unique
-  accountHolderName     String?
-  accountNumber         String?
-  bankName              String?
-  Code                  String?
-  bankChangeRequests    BankChangeRequest[]
-  business              Business               @relation(fields: [businessId], references: [id])
-  user                  User?                  @relation(fields: [userId], references: [id])
-  leaves                Leave[]
-  loans                 Loan[]
-  overtimes             Overtime[]
-  payslips              Payslip[]
-  attendances           Attendance[]
-  timeEntries           TimeEntry[]
-  expenses              Expense[]
+  id                 String              @id @default(uuid())
+  businessId         String
+  name               String
+  email              String?
+  phone              String?
+  designation        String?
+  joinDate           DateTime?
+  basicSalary        Float
+  createdAt          DateTime            @default(now())
+  allowance          Json?
+  deduction          Json?
+  leaveBalance       Json?
+  userId             String?             @unique
+  accountHolderName  String?
+  accountNumber      String?
+  bankName           String?
+  Code               String?
+  bankChangeRequests BankChangeRequest[]
+  business           Business            @relation(fields: [businessId], references: [id])
+  user               User?               @relation(fields: [userId], references: [id])
+  leaves             Leave[]
+  loans              Loan[]
+  overtimes          Overtime[]
+  payslips           Payslip[]
+  attendances        Attendance[]
+  timeEntries        TimeEntry[]
+  expenses           Expense[]
 }
 
 model Attendance {
@@ -825,42 +830,42 @@ model Expense {
   date          DateTime
   notes         String?
   vendorId      String?
-  
-  status        String   @default("Draft") // Draft, Submitted, Manager Approval, Finance Approval, Reimbursed, Rejected
-  employeeId    String?
-  taskId        String?
-  department    String?
-  costCenter    String?
-  managerId     String?
-  financeId     String?
+
+  status           String  @default("Draft") // Draft, Submitted, Manager Approval, Finance Approval, Reimbursed, Rejected
+  employeeId       String?
+  taskId           String?
+  department       String?
+  costCenter       String?
+  managerId        String?
+  financeId        String?
   approvalComments String? @db.Text
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
-  business      Business @relation(fields: [businessId], references: [id])
-  vendor        Vendor?  @relation(fields: [vendorId], references: [id])
-  projectId     String?
-  project       Project? @relation(fields: [projectId], references: [id])
-  employee      Employee? @relation(fields: [employeeId], references: [id])
-  task          ProjectTask? @relation(fields: [taskId], references: [id])
-  manager       User?    @relation("ExpenseManager", fields: [managerId], references: [id])
-  finance       User?    @relation("ExpenseFinance", fields: [financeId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  auditLogs     ExpenseAuditLog[]
+  business  Business     @relation(fields: [businessId], references: [id])
+  vendor    Vendor?      @relation(fields: [vendorId], references: [id])
+  projectId String?
+  project   Project?     @relation(fields: [projectId], references: [id])
+  employee  Employee?    @relation(fields: [employeeId], references: [id])
+  task      ProjectTask? @relation(fields: [taskId], references: [id])
+  manager   User?        @relation("ExpenseManager", fields: [managerId], references: [id])
+  finance   User?        @relation("ExpenseFinance", fields: [financeId], references: [id])
+
+  auditLogs ExpenseAuditLog[]
 }
 
 model ExpenseAuditLog {
   id          String   @id @default(uuid())
   businessId  String
   expenseId   String
-  action      String   // Created, Submitted, Approved (Manager), Approved (Finance), Reimbursed, Rejected, Edited, Deleted
+  action      String // Created, Submitted, Approved (Manager), Approved (Finance), Reimbursed, Rejected, Edited, Deleted
   performedBy String?
   comments    String?  @db.Text
   createdAt   DateTime @default(now())
 
-  expense     Expense  @relation(fields: [expenseId], references: [id], onDelete: Cascade)
-  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  expense  Expense  @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 }
 
 model Vendor {
@@ -1112,6 +1117,12 @@ model Lead {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  customerId String?
+  customer   Customer? @relation("LeadToCustomer", fields: [customerId], references: [id])
+
+  requirementId String?
+  requirement   ProjectRequirement? @relation(fields: [requirementId], references: [id])
 
   customers Customer[]
 
@@ -2054,9 +2065,9 @@ model TimeEntry {
 
   description String?
   hours       Float
-  overtime    Float @default(0)
+  overtime    Float   @default(0)
   billable    Boolean @default(true)
-  status      String @default("DRAFT")
+  status      String  @default("DRAFT")
 
   date DateTime @default(now())
 
@@ -2969,14 +2980,30 @@ model ProjectRequirement {
   location           String?
   status             String   @default("New")
 
+  projectType   String?
+  executionType String?
+  currency      String?
+  country       String?
+  timezone      String?
+  deliverables  Json?
+  team          Json?
+  contactPerson String?
+  email         String?
+  phone         String?
+  company       String?
+  createdBy     String? // Added createdBy field
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   business         Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
   customer         Customer            @relation(fields: [customerId], references: [id])
   contact          CustomerContact?    @relation(fields: [contactId], references: [id])
-  assignedEmployee User?           @relation("RequirementAssignedTo", fields: [assignedEmployeeId], references: [id])
+  assignedEmployee User?               @relation("RequirementAssignedTo", fields: [assignedEmployeeId], references: [id])
+  inquiries        Lead[]
   estimations      ProjectEstimation[]
+  meetings         ProjectMeeting[]
+  projectBudgets   ProjectBudget[]
 }
 
 model ProjectEstimation {
@@ -2999,8 +3026,34 @@ model ProjectEstimation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  business       Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  requirement    ProjectRequirement? @relation(fields: [requirementId], references: [id])
+  projectBudgets ProjectBudget[]
+}
+
+model ProjectMeeting {
+  id            String  @id @default(uuid())
+  businessId    String
+  title         String
+  requirementId String?
+  customerId    String?
+  inquiryId     String?
+  meetingDate   String
+  meetingTime   String
+  meetingType   String
+  attendees     String?
+  notes         String? @db.Text
+  status        String  @default("Scheduled")
+  createdBy     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   business    Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
   requirement ProjectRequirement? @relation(fields: [requirementId], references: [id])
+  customer    Customer?           @relation(fields: [customerId], references: [id])
+  project     Project?            @relation(fields: [projectId], references: [id])
+  projectId   String?
 }
 
 model Project {
@@ -3045,7 +3098,7 @@ model Project {
 
   business       Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
   customer       Customer         @relation(fields: [customerId], references: [id])
-  projectManager User?        @relation("ProjectManager", fields: [projectManagerId], references: [id])
+  projectManager User?            @relation("ProjectManager", fields: [projectManagerId], references: [id])
   quotation      Quotation?       @relation(fields: [quotationId], references: [id])
   salesOrder     SalesOrder?      @relation(fields: [salesOrderId], references: [id])
   template       ProjectTemplate? @relation(fields: [templateId], references: [id])
@@ -3062,6 +3115,7 @@ model Project {
   risks            ProjectRisk[]
   documents        ProjectDocument[]
   meetings         ProjectMeeting[]
+  projectBudget    ProjectBudget?
 }
 
 model ProjectMilestone {
@@ -3081,7 +3135,7 @@ model ProjectMilestone {
 
   business Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
   project  Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  owner    User?     @relation("MilestoneOwner", fields: [ownerId], references: [id])
+  owner    User?         @relation("MilestoneOwner", fields: [ownerId], references: [id])
   tasks    ProjectTask[]
 }
 
@@ -3111,36 +3165,36 @@ model ProjectTask {
   business    Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
   project     Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
   milestone   ProjectMilestone? @relation(fields: [milestoneId], references: [id])
-  assignedTo  User?         @relation("TaskAssignedTo", fields: [assignedToId], references: [id])
+  assignedTo  User?             @relation("TaskAssignedTo", fields: [assignedToId], references: [id])
   timeEntries TimeEntry[]
   expenses    Expense[]
 }
 
 model ProjectIssue {
-  id          String  @id @default(uuid())
+  id          String    @id @default(uuid())
   businessId  String
   projectId   String
   issueCode   String?
   title       String
-  description String? @db.Text
+  description String?   @db.Text
   module      String?
   severity    String?
   priority    String?
   impact      String?
-  rootCause   String? @db.Text
+  rootCause   String?   @db.Text
   reporterId  String?
   assigneeId  String?
-  resolution  String? @db.Text
-  status      String  @default("Open")
+  resolution  String?   @db.Text
+  status      String    @default("Open")
   dueDate     DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  business  Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  reporter  User?     @relation("IssueReporter", fields: [reporterId], references: [id])
-  assignee  User?     @relation("IssueAssignee", fields: [assigneeId], references: [id])
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  project  Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  reporter User?    @relation("IssueReporter", fields: [reporterId], references: [id])
+  assignee User?    @relation("IssueAssignee", fields: [assigneeId], references: [id])
 }
 
 model ProjectChangeRequest {
@@ -3163,10 +3217,10 @@ model ProjectChangeRequest {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  business    Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  requestedBy User?     @relation("ChangeRequestOwner", fields: [requestedById], references: [id])
-  assignedTo  User?     @relation("ChangeRequestAssignee", fields: [assignedToId], references: [id])
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  requestedBy User?    @relation("ChangeRequestOwner", fields: [requestedById], references: [id])
+  assignedTo  User?    @relation("ChangeRequestAssignee", fields: [assignedToId], references: [id])
 }
 
 model ProjectRisk {
@@ -3194,61 +3248,43 @@ model ProjectDocument {
   title        String
   fileUrl      String
   fileType     String?
-  fileSize     Int?    // in bytes
+  fileSize     Int? // in bytes
   mimeType     String?
   uploadedById String?
 
   // Extended fields
-  folder       String?  @default("General")
-  entityType   String?  // Project, Task, Milestone, Issue, Change Request, Invoice, Expense, Contract, Customer, Vendor, Employee
-  entityId     String?
-  version      Int      @default(1)
-  parentDocId  String?  // for version history
-  tags         String[]  @default([])
-  description  String?  @db.Text
-  permission   String?  @default("Owner") // Owner, Manager, Editor, Viewer, Guest
-  downloadCount Int     @default(0)
-  viewCount    Int      @default(0)
-  isArchived   Boolean  @default(false)
+  folder        String?  @default("General")
+  entityType    String? // Project, Task, Milestone, Issue, Change Request, Invoice, Expense, Contract, Customer, Vendor, Employee
+  entityId      String?
+  version       Int      @default(1)
+  parentDocId   String? // for version history
+  tags          String[] @default([])
+  description   String?  @db.Text
+  permission    String?  @default("Owner") // Owner, Manager, Editor, Viewer, Guest
+  downloadCount Int      @default(0)
+  viewCount     Int      @default(0)
+  isArchived    Boolean  @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  business   Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  project    Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  uploadedBy User?     @relation("DocumentUploader", fields: [uploadedById], references: [id])
+  business   Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  project    Project?           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  uploadedBy User?              @relation("DocumentUploader", fields: [uploadedById], references: [id])
   auditLogs  DocumentAuditLog[]
 }
 
 model DocumentAuditLog {
-  id           String   @id @default(uuid())
-  businessId   String
-  documentId   String
-  action       String   // Uploaded, Viewed, Downloaded, Renamed, Moved, Deleted, Versioned, Shared
-  performedBy  String?
-  comments     String?  @db.Text
-  createdAt    DateTime @default(now())
+  id          String   @id @default(uuid())
+  businessId  String
+  documentId  String
+  action      String // Uploaded, Viewed, Downloaded, Renamed, Moved, Deleted, Versioned, Shared
+  performedBy String?
+  comments    String?  @db.Text
+  createdAt   DateTime @default(now())
 
-  document     ProjectDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  business     Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
-}
-
-model ProjectMeeting {
-  id         String   @id @default(uuid())
-  businessId String
-  projectId  String
-  title      String
-  agenda     String?  @db.Text
-  date       DateTime
-  duration   Int? // minutes
-  meetingUrl String?
-  minutes    String?  @db.Text
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  project  Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  document ProjectDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  business Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
 }
 
 model ProjectTemplate {
@@ -3267,21 +3303,52 @@ model ProjectTemplate {
 }
 
 model ProjectBudgetHistory {
-  id              String   @id @default(uuid())
-  businessId      String
-  projectId       String
-  oldBudget       Float
-  newBudget       Float
-  difference      Float
-  reason          String?  @db.Text
-  remarks         String?  @db.Text
-  approvedById    String?
-  effectiveDate   DateTime?
+  id            String    @id @default(uuid())
+  businessId    String
+  projectId     String
+  oldBudget     Float
+  newBudget     Float
+  difference    Float
+  reason        String?   @db.Text
+  remarks       String?   @db.Text
+  approvedById  String?
+  effectiveDate DateTime?
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  business        Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  approvedBy      User?    @relation("BudgetHistoryApprover", fields: [approvedById], references: [id])
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  approvedBy User?    @relation("BudgetHistoryApprover", fields: [approvedById], references: [id])
+}
+
+model ProjectBudget {
+  id            String  @id @default(uuid())
+  budgetCode    String  @unique
+  businessId    String
+  projectId     String  @unique
+  customerId    String?
+  requirementId String?
+  estimateId    String?
+  department    String?
+
+  approvedBudget  Float @default(0)
+  actualCost      Float @default(0)
+  committedCost   Float @default(0)
+  remainingBudget Float @default(0)
+  variance        Float @default(0)
+
+  status           String  @default("ACTIVE")
+  currency         String?
+  projectManagerId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  business       Business            @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  project        Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  customer       Customer?           @relation(fields: [customerId], references: [id])
+  requirement    ProjectRequirement? @relation(fields: [requirementId], references: [id])
+  estimate       ProjectEstimation?  @relation(fields: [estimateId], references: [id])
+  projectManager User?               @relation(fields: [projectManagerId], references: [id])
 }
