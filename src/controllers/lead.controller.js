@@ -12,6 +12,7 @@ exports.createLead = async (req, res) => {
       email,
       phone,
       company,
+      customerId,
       website,
       position,
       city,
@@ -29,6 +30,49 @@ exports.createLead = async (req, res) => {
       defaultLanguage = "SYSTEM",
       score = 0,
       campaignId,
+      type, // "INQUIRY" when created from Project Operations, else "LEAD"
+      inquiryNumber,
+      inquiryTitle,
+      inquiryType,
+      priority = "MEDIUM",
+      department,
+      businessUnit,
+      currency,
+      budgetRange,
+      expectedRevenue,
+      probability,
+      expectedDecisionDate,
+      projectType,
+      executionType = "AUTO_DETECT",
+      expectedStartDate,
+      expectedCompletionDate,
+      expectedDuration,
+      businessRequirement,
+      currentBusinessProblem,
+      expectedSolution,
+      scopeSummary,
+      deliverables,
+      estimatedTeamSize,
+      timezone,
+      internalNotes,
+      salesStrategy,
+      competitors,
+      competitorName,
+      riskLevel,
+      winProbability,
+      expectedProfit,
+      expectedMargin,
+      managementNotes,
+      nextFollowUpDate,
+      reminder = false,
+      meetingDate,
+      meetingType,
+      meetingLocation,
+      followUpNotes,
+      companySize,
+      preferredCommunication,
+      industry,
+      gstVatNumber,
     } = req.body;
 
     if (!name) {
@@ -79,6 +123,14 @@ exports.createLead = async (req, res) => {
       }
     }
 
+    let finalInquiryNumber = inquiryNumber;
+    if (type === "INQUIRY" && !finalInquiryNumber) {
+      const inqCount = await prisma.lead.count({
+        where: { businessId: req.business.id, inquiryNumber: { not: null } }
+      });
+      finalInquiryNumber = `INQ-${String(inqCount + 1).padStart(3, '0')}`;
+    }
+
     const lead = await prisma.lead.create({
       data: {
         businessId: req.business.id,
@@ -86,6 +138,7 @@ exports.createLead = async (req, res) => {
         email,
         phone,
         company,
+        customerId,
         website,
         position,
         city,
@@ -103,6 +156,48 @@ exports.createLead = async (req, res) => {
         defaultLanguage,
         score: parseInt(score) || 0,
         campaignId,
+        inquiryNumber: finalInquiryNumber,
+        inquiryTitle,
+        inquiryType,
+        priority,
+        department,
+        businessUnit,
+        currency,
+        budgetRange,
+        expectedRevenue: expectedRevenue ? Number(expectedRevenue) : null,
+        probability: probability ? Number(probability) : null,
+        expectedDecisionDate: expectedDecisionDate ? new Date(expectedDecisionDate) : null,
+        projectType,
+        executionType,
+        expectedStartDate: expectedStartDate ? new Date(expectedStartDate) : null,
+        expectedCompletionDate: expectedCompletionDate ? new Date(expectedCompletionDate) : null,
+        expectedDuration,
+        businessRequirement,
+        currentBusinessProblem,
+        expectedSolution,
+        scopeSummary,
+        deliverables,
+        estimatedTeamSize: estimatedTeamSize ? Number(estimatedTeamSize) : null,
+        timezone,
+        internalNotes,
+        salesStrategy,
+        competitors,
+        competitorName,
+        riskLevel,
+        winProbability: winProbability ? Number(winProbability) : null,
+        expectedProfit: expectedProfit ? Number(expectedProfit) : null,
+        expectedMargin: expectedMargin ? Number(expectedMargin) : null,
+        managementNotes,
+        nextFollowUpDate: nextFollowUpDate ? new Date(nextFollowUpDate) : null,
+        reminder: Boolean(reminder),
+        meetingDate: meetingDate ? new Date(meetingDate) : null,
+        meetingType,
+        meetingLocation,
+        followUpNotes,
+        companySize,
+        preferredCommunication,
+        industry,
+        gstVatNumber,
       },
       include: {
         assignedTo: { include: { user: true } },
@@ -120,7 +215,7 @@ exports.createLead = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: "Lead created successfully",
+      message: type === "INQUIRY" ? "Inquiry created successfully" : "Lead created successfully",
       data: lead,
     });
   } catch (error) {

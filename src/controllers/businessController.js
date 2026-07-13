@@ -1,92 +1,23 @@
 const prisma = require("../config/prisma");
 const { successResponse, errorResponse } = require("../utils/response");
 
+const businessSetupService = require("../services/BusinessSetupService");
+
 //////////////////////////////////////////////////////
 // CREATE BUSINESS
 //////////////////////////////////////////////////////
 exports.createBusiness = async (req, res) => {
   try {
-    const { name } = req.body;
+    const { name, country } = req.body;
     const userId = req.user.userId;
 
-    //////////////////////////////////////////////////////
-    // 1️⃣ CREATE BUSINESS (INACTIVE BY DEFAULT)
-    //////////////////////////////////////////////////////
-    const business = await prisma.business.create({
-      data: {
-        name,
-        ownerId: userId,
-        isActive: false, // ❗ only subscription admin activates
-      },
-    });
-
-    //////////////////////////////////////////////////////
-    // 2️⃣ CREATE SUBSCRIPTION (INACTIVE)
-    //////////////////////////////////////////////////////
-    await prisma.subscription.create({
-      data: {
-        businessId: business.id,
-        status: "INACTIVE",
-      },
-    });
-
-   //////////////////////////////////////////////////////
-    // 3️⃣ CREATE ROLES
-    //////////////////////////////////////////////////////
-
-    // Admin role
-    const adminRole = await prisma.role.create({
-      data: {
-        name: "Admin",
-        businessId: business.id,
-      },
-    });
-
-    // ⭐ Default User role (IMPORTANT FOR INVITE)
-    await prisma.role.create({
-      data: {
-        name: "User",
-        businessId: business.id,
-      },
-    });
-
-    //////////////////////////////////////////////////////
-    // 4️⃣ ASSIGN ALL PERMISSIONS TO ADMIN
-    //////////////////////////////////////////////////////
-    const permissions = await prisma.permission.findMany();
-
-    if (permissions.length > 0) {
-      await prisma.rolePermission.createMany({
-        data: permissions.map((p) => ({
-          roleId: adminRole.id,
-          permissionId: p.id,
-        })),
-      });
+    if (!name || !country) {
+      return errorResponse(res, "Business Name and Country are required.", 400);
     }
 
-    //////////////////////////////////////////////////////
-    // 5️⃣ ADD OWNER AS BUSINESS ADMIN
-    //////////////////////////////////////////////////////
-    await prisma.businessUser.create({
-      data: {
-        userId,
-        businessId: business.id,
-        roleId: adminRole.id,
-      },
-    });
-
-    //////////////////////////////////////////////////////
-    // ⭐ AUTO SET ACTIVE BUSINESS FOR USER
-    //////////////////////////////////////////////////////
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        activeBusinessId: business.id,
-      },
-    });
+    const business = await businessSetupService.setupNewBusiness(name, country, userId);
 
     return successResponse(res, business, "Business created", 201);
-
   } catch (error) {
     console.error("Create business error:", error);
     return errorResponse(res, error.message, 500);
@@ -342,4 +273,46 @@ const membership = await prisma.businessUser.findFirst({
     });
   }
 };
-  
+
+
+//////////////////////////////////////////////////////
+// GET ALL BUSINESS USERS (FOR DROPDOWNS)
+//////////////////////////////////////////////////////
+exports.getBusinessUsersList = async (req, res) => {
+  try {
+    const { businessId } = req.params;
+
+    const memberships = await prisma.businessUser.findMany({
+      where: {
+        businessId,
+        isActive: true,
+      },
+      include: {
+        user: true,
+        role: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const usersList = memberships.map((m) => ({
+      id: m.user.id, // CRITICAL: returning the global User.id for relations
+      name: m.user.name,
+      email: m.user.email,
+      role: m.role?.name || "Member",
+      department: "General", // Placeholder as department usually lives in Employee
+      avatar: null,
+      status: m.isActive ? "Active" : "Inactive",
+    }));
+
+    return res.status(200).json({
+      success: true,
+      users: usersList,
+    });
+  } catch (error) {
+    console.error("getBusinessUsersList error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch users",
+    });
+  }
+};
