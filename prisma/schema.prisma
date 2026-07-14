@@ -39,8 +39,8 @@ model User {
   projectBudgets  ProjectBudget[]
 
   @@map("users")
-  ticketComments TicketComment[]\n}}
-
+  ticketComments TicketComment[]
+}
 model Business {
   id        String   @id @default(uuid())
   name      String
@@ -173,8 +173,16 @@ model Business {
   projectBudgets         ProjectBudget[]
 
   @@map("businesses")
-  warranties Warranty[]\n  warrantyAttachments WarrantyAttachment[]\n  warrantyReminders WarrantyReminder[]\n  amcs AMC[]\n  amcVisits AMCVisit[]\n  amcRenewals AMCRenewal[]\n  tickets Ticket[]\n  ticketComments TicketComment[]\n  ticketAttachments TicketAttachment[]\n}}
-
+  warranties Warranty[]
+  warrantyAttachments WarrantyAttachment[]
+  warrantyReminders WarrantyReminder[]
+  amcs AMC[]
+  amcVisits AMCVisit[]
+  amcRenewals AMCRenewal[]
+  tickets Ticket[]
+  ticketComments TicketComment[]
+  ticketAttachments TicketAttachment[]
+}
 //////////////////////////////////////////////////////
 // BUSINESS USERS (User ↔ Business)
 //////////////////////////////////////////////////////
@@ -386,8 +394,10 @@ model Customer {
   @@index([parentAccountId])
   @@index([isDeleted])
   @@map("customers")
-  warranties Warranty[]\n  amcs AMC[]\n  tickets Ticket[]\n}}
-
+  warranties Warranty[]
+  amcs AMC[]
+  tickets Ticket[]
+}
 // enum Region {
 //   INDIA
 //   UAE
@@ -719,8 +729,10 @@ model Employee {
   attendances        Attendance[]
   timeEntries        TimeEntry[]
   expenses           Expense[]
-  amcsAssigned AMC[] @relation("AMCEngineer")\n  amcVisits AMCVisit[]\n  ticketsAssigned Ticket[] @relation("TicketEngineer")\n}}
-
+  amcsAssigned AMC[] @relation("AMCEngineer")
+  amcVisits AMCVisit[]
+  ticketsAssigned Ticket[] @relation("TicketEngineer")
+}
 model Attendance {
   id         String    @id @default(uuid())
   businessId String
@@ -3116,8 +3128,10 @@ model Project {
   documents        ProjectDocument[]
   meetings         ProjectMeeting[]
   projectBudget    ProjectBudget?
-  warranties Warranty[]\n  amcs AMC[]\n  tickets Ticket[]\n}}
-
+  warranties Warranty[]
+  amcs AMC[]
+  tickets Ticket[]
+}
 model ProjectMilestone {
   id          String    @id @default(uuid())
   businessId  String
@@ -3352,7 +3366,7 @@ model ProjectBudget {
   estimate       ProjectEstimation?  @relation(fields: [estimateId], references: [id])
   projectManager User?               @relation(fields: [projectManagerId], references: [id])
 }
-\n
+
 // ==========================================
 // WARRANTY MODULE
 // ==========================================
