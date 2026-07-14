@@ -22,6 +22,9 @@ model User {
   activeBusiness   Business?      @relation("ActiveBusiness", fields: [activeBusinessId], references: [id])
   settings         Settings[]     @relation("SettingsToUser")
 
+  resetToken       String?
+  resetTokenExpiry DateTime?
+
   // Project Operations Relations
   projectManagerOf       Project[]              @relation("ProjectManager")
   assignedTasks          ProjectTask[]          @relation("TaskAssignedTo")

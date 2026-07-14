@@ -1,5 +1,7 @@
 const prisma = require("../config/prisma");
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
+const { sendResetEmail } = require("../utils/mailer");
 const { generateToken } = require("../utils/jwtUtils");
 const { successResponse, errorResponse } = require("../utils/response");
 
@@ -264,5 +266,94 @@ exports.updateUser = async (req, res) => {
   } catch (error) {
     console.error("Update user error:", error);
     return errorResponse(res, "Internal server error");
+  }
+};
+
+//////////////////////////////////////////////////////
+// FORGOT PASSWORD
+//////////////////////////////////////////////////////
+exports.forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return errorResponse(res, "Email is required", 400);
+    }
+
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      // Do not reveal sensitive information beyond this
+      return errorResponse(res, "No account found with this email.", 404);
+    }
+
+    // Generate token
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const hashedToken = crypto.createHash("sha256").update(resetToken).digest("hex");
+    
+    // Set expiry (1 hour)
+    const tokenExpiry = new Date(Date.now() + 60 * 60 * 1000);
+
+    await prisma.user.update({
+      where: { email },
+      data: {
+        resetToken: hashedToken,
+        resetTokenExpiry: tokenExpiry,
+      },
+    });
+
+    // Send the email synchronously
+    await sendResetEmail(user.email, user.name, resetToken);
+
+    return successResponse(res, null, "Password reset link sent to your email.");
+  } catch (error) {
+    console.error("Forgot password error:", error);
+    return errorResponse(res, error.message || "Failed to send reset email. Please try again later.", 500);
+  }
+};
+
+//////////////////////////////////////////////////////
+// RESET PASSWORD
+//////////////////////////////////////////////////////
+exports.resetPassword = async (req, res) => {
+  try {
+    const { token, password } = req.body;
+    
+    if (!token || !password) {
+      return errorResponse(res, "Token and new password are required", 400);
+    }
+
+    // Hash the incoming plain token to find in DB
+    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+
+    // Find user with valid token
+    const user = await prisma.user.findFirst({
+      where: {
+        resetToken: hashedToken,
+        resetTokenExpiry: {
+          gt: new Date() // Must be in the future
+        }
+      }
+    });
+
+    if (!user) {
+      return errorResponse(res, "Invalid or expired reset token", 400);
+    }
+
+    // Hash new password using bcrypt
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Update user password and clear reset token
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashedPassword,
+        resetToken: null,
+        resetTokenExpiry: null
+      }
+    });
+
+    return successResponse(res, null, "Your password has been reset successfully.");
+  } catch (error) {
+    console.error("Reset password error:", error);
+    return errorResponse(res, "Internal server error", 500);
   }
 };
