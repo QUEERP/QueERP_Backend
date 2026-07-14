@@ -574,45 +574,49 @@ exports.updateChangeRequest = async (req, res) => {
 
 exports.getGlobalBudgets = async (req, res) => {
   try {
-    const budgets = await prisma.projectBudget.findMany({
+    const projects = await prisma.project.findMany({
       where: { businessId: req.business.id },
       include: {
-        project: {
-          include: {
-            expenses: { select: { amount: true, status: true } },
-            purchaseOrders: { select: { totalAmount: true, status: true } }
-          }
-        },
+        expenses: { select: { amount: true, status: true } },
+        purchaseOrders: { select: { totalAmount: true, status: true } },
         customer: true,
         projectManager: true
       },
       orderBy: { createdAt: 'desc' }
     });
 
-    const enrichedBudgets = budgets.map(b => {
-      const actualCost = b.project?.expenses?.filter(e => e.status === 'APPROVED' || e.status === 'PAID').reduce((sum, e) => sum + (e.amount || 0), 0) || 0;
-      const committedCost = b.project?.purchaseOrders?.filter(po => po.status !== 'CANCELLED').reduce((sum, po) => sum + (po.totalAmount || 0), 0) || 0;
+    const enrichedBudgets = projects.filter(p => p.budget > 0).map(p => {
+      const actualCost = p.expenses?.filter(e => e.status === 'APPROVED' || e.status === 'PAID').reduce((sum, e) => sum + (e.amount || 0), 0) || 0;
+      const committedCost = p.purchaseOrders?.filter(po => po.status !== 'CANCELLED').reduce((sum, po) => sum + (po.totalAmount || 0), 0) || 0;
       
       const utilized = actualCost + committedCost;
-      const remaining = (b.approvedBudget || 0) - utilized;
+      const remaining = (p.budget || 0) - utilized;
       const variance = remaining;
-      const utilizationPercent = b.approvedBudget > 0 ? (utilized / b.approvedBudget) * 100 : 0;
+      const utilizationPercent = p.budget > 0 ? (utilized / p.budget) * 100 : 0;
       
-      let computedStatus = b.status || "ACTIVE";
-      if (b.approvedBudget > 0 && computedStatus !== 'COMPLETED') {
+      let computedStatus = p.status || "ACTIVE";
+      if (p.budget > 0 && computedStatus !== 'COMPLETED') {
         if (utilizationPercent > 100) computedStatus = "OVER_BUDGET";
         else if (utilizationPercent >= 81) computedStatus = "AT_RISK";
         else computedStatus = "ON_TRACK";
       }
 
       return {
-        ...b,
+        id: p.id,
+        budgetCode: `BUD-${p.projectCode || p.id.substring(0,6)}`,
+        projectId: p.id,
+        project: p,
+        customer: p.customer,
+        department: p.department || 'General',
+        projectManager: p.projectManager,
+        approvedBudget: p.budget,
         actualCost,
         committedCost,
         remainingBudget: remaining,
         variance,
         utilizationPercent: parseFloat(utilizationPercent.toFixed(2)),
-        budgetStatus: computedStatus
+        budgetStatus: computedStatus,
+        budgetHistories: p.budgetHistories || []
       };
     });
 
@@ -762,8 +766,8 @@ exports.getGlobalExpenses = async (req, res) => {
         employee: { select: { name: true, id: true } },
         task: { select: { title: true, id: true } },
         vendor: { select: { name: true, id: true } },
-        manager: { select: { name: true, firstName: true } },
-        finance: { select: { name: true, firstName: true } },
+        manager: { select: { name: true } },
+        finance: { select: { name: true } },
         auditLogs: { orderBy: { createdAt: 'desc' } }
       },
       orderBy: { createdAt: 'desc' }
@@ -828,6 +832,20 @@ exports.updateGlobalExpenseWorkflow = async (req, res) => {
           where: { id: expense.projectId },
           data: { actualCost: { increment: expense.amount } }
         });
+        
+        const projBudget = await tx.projectBudget.findUnique({
+          where: { projectId: expense.projectId }
+        });
+        
+        if (projBudget) {
+          await tx.projectBudget.update({
+            where: { id: projBudget.id },
+            data: {
+              actualCost: { increment: expense.amount },
+              remainingBudget: { decrement: expense.amount }
+            }
+          });
+        }
       }
     });
 
@@ -875,7 +893,7 @@ exports.getGlobalBilling = async (req, res) => {
     const invoices = await prisma.invoice.findMany({
       where: { businessId: req.business.id, isDeleted: false },
       include: {
-        customer: { select: { name: true, id: true } },
+        customer: true,
         project: { select: { projectName: true, projectCode: true, id: true } },
         payments: true,
         auditLogs: { orderBy: { createdAt: 'desc' } }
@@ -983,7 +1001,7 @@ exports.addGlobalInvoicePayment = async (req, res) => {
       if (invoice.projectId) {
         await tx.project.update({
           where: { id: invoice.projectId },
-          data: { collectedRevenue: { increment: parseFloat(amount) } }
+          data: { revenue: { increment: parseFloat(amount) } }
         });
       }
 
@@ -1021,7 +1039,7 @@ exports.getGlobalProfitability = async (req, res) => {
     });
 
     const data = projects.map(p => {
-      const revenue = p.collectedRevenue || 0;
+      const revenue = p.revenue || 0;
       const cost = p.actualCost || 0;
       const profit = revenue - cost;
       const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
