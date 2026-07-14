@@ -319,8 +319,12 @@ exports.createProject = async (req, res) => {
 
 exports.getProjects = async (req, res) => {
   try {
+    const { customerId } = req.query;
+    const where = { businessId: req.business.id };
+    if (customerId) where.customerId = customerId;
+
     const projects = await prisma.project.findMany({
-      where: { businessId: req.business.id },
+      where,
       include: {
         customer: true,
         projectManager: true,
