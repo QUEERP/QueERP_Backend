@@ -5,6 +5,8 @@ const authController = require("../controllers/authController");
 // Public routes (no authentication required)
 router.post("/register", authController.register);
 router.post("/login", authController.login);
+router.post("/forgot-password", authController.forgotPassword);
+router.post("/reset-password", authController.resetPassword);
 router.get("/", authController.getAllUsers);
 router.get("/me", authMiddleware, authController.getLoggedInUser);
 router.put("/update", authMiddleware, authController.updateUser);
