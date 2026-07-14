@@ -2,8 +2,15 @@ const prisma = require("../config/prisma");
 
 exports.getTickets = async (req, res) => {
   try {
+    const { customerId, projectId, warrantyId, amcId } = req.query;
+    const where = { businessId: req.business.id };
+    if (customerId) where.customerId = customerId;
+    if (projectId) where.projectId = projectId;
+    if (warrantyId) where.warrantyId = warrantyId;
+    if (amcId) where.amcId = amcId;
+
     const tickets = await prisma.ticket.findMany({
-      where: { businessId: req.business.id },
+      where,
       include: {
         project: { select: { id: true, projectName: true, projectCode: true } },
         customer: { select: { id: true, company: true } },

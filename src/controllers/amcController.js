@@ -2,8 +2,13 @@ const prisma = require("../config/prisma");
 
 exports.getAMCs = async (req, res) => {
   try {
+    const { customerId, projectId } = req.query;
+    const where = { businessId: req.business.id };
+    if (customerId) where.customerId = customerId;
+    if (projectId) where.projectId = projectId;
+
     const amcs = await prisma.aMC.findMany({
-      where: { businessId: req.business.id },
+      where,
       include: {
         project: { select: { id: true, projectName: true, projectCode: true } },
         customer: { select: { id: true, company: true } },
