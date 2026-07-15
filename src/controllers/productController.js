@@ -198,14 +198,14 @@ exports.createProduct = async (req, res) => {
       taxCode,
       unit = "pcs",
       taxPercent = 0,
-      initialQty = 0,
+      initialQty,
       warehouseId
     } = req.body;
 
-    if (!name || !sku || !price || !type) {
+    if (!name || !sku || price === undefined || price === null || !type || initialQty === undefined || initialQty === null) {
       return res.status(400).json({
         success: false,
-        message: "name, sku, price and type are required",
+        message: "name, sku, price, type, and initialQty are required",
       });
     }
 

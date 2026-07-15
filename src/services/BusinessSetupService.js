@@ -1,11 +1,18 @@
 const prisma = require("../config/prisma");
+const { getCountryData } = require("../utils/countryHelper");
 
 class BusinessSetupService {
   async setupNewBusiness(name, country, userId) {
-    const isIndia = country === 'INDIA';
-    const isUAE = country === 'UAE';
-    const currency = isIndia ? 'INR' : (isUAE ? 'AED' : 'USD');
-    const currencySymbol = isIndia ? '₹' : (isUAE ? 'د.إ' : '$');
+    const countryInfo = getCountryData(country); // country is now CCA2 code like 'IN', 'AE'
+    
+    // Fallback if country info not found
+    const countryCode = countryInfo ? countryInfo.code : 'IN';
+    const currencyCode = countryInfo ? countryInfo.currencyCode : 'INR';
+    const currencySymbol = countryInfo ? countryInfo.currencySymbol : '₹';
+    const taxType = countryInfo ? countryInfo.taxType : 'INDIA_GST';
+    
+    const isIndia = countryCode === 'IN';
+    const isUAE = countryCode === 'AE';
     const invoicePrefix = isIndia ? 'INV-IND-' : (isUAE ? 'INV-UAE-' : 'INV-');
     
     // Default Finance Accounts based on Country
@@ -27,8 +34,11 @@ class BusinessSetupService {
       const newBusiness = await tx.business.create({
         data: {
           name,
-          country: country || 'INDIA',
-          currency,
+          countryCode: countryCode,
+          currencyCode: currencyCode,
+          currencySymbol: currencySymbol,
+          taxType: taxType,
+          currency: currencyCode, // Keeping old field populated to prevent immediate breakages
           ownerId: userId,
           isActive: false, // Wait for subscription/admin approval if needed, though prompt says "immediately after creation"
         }
@@ -47,7 +57,7 @@ class BusinessSetupService {
         data: {
           businessId: newBusiness.id,
           companyName: name,
-          currency,
+          currency: currencyCode,
           currencySymbol,
           invoicePrefix,
           invoiceFormat: "INV-YYYY-MM-DD-COUNT",
@@ -111,12 +121,12 @@ class BusinessSetupService {
     return business;
   }
 
-  async setupCountryCompliance(businessId, country) {
+  async setupCountryCompliance(businessId, countryCode) {
     // This connects to the Country Compliance Service.
     // For now, we simulate inserting a few rules based on the country.
     
-    const isIndia = country === 'INDIA';
-    const isUAE = country === 'UAE';
+    const isIndia = countryCode === 'IN';
+    const isUAE = countryCode === 'AE';
 
     const rulesToCreate = [];
 

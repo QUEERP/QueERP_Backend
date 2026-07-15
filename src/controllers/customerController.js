@@ -59,10 +59,10 @@ exports.createCustomer = async (req, res) => {
       });
     }
 
-    if (!region || !["INDIA", "UAE"].includes(region)) {
+    if (!region) {
       return res.status(400).json({
         success: false,
-        message: "Valid region is required (INDIA / UAE)",
+        message: "Valid region is required",
       });
     }
 
@@ -137,9 +137,9 @@ exports.createCustomer = async (req, res) => {
         industry,
         annualRevenue: annualRevenue ? Number(annualRevenue) : null,
         employeeCount: employeeCount ? parseInt(employeeCount) : null,
-        accountOwnerId,
-        accountType,
-        parentAccountId,
+        accountOwnerId: accountOwnerId || undefined,
+        accountType: accountType || undefined,
+        parentAccountId: parentAccountId || undefined,
         linkedinUrl,
         facebookUrl,
         twitterUrl,
@@ -263,6 +263,7 @@ exports.updateCustomer = async (req, res) => {
       accountOwnerId,
       parentAccountId,
       tags,
+      accountType,
       ...rest
     } = req.body;
 
@@ -279,10 +280,10 @@ exports.updateCustomer = async (req, res) => {
     }
 
     // Validate Region
-    if (region && !["INDIA", "UAE"].includes(region)) {
+    if (region && typeof region !== 'string') {
       return res.status(400).json({
         success: false,
-        message: "Invalid region (INDIA / UAE only)",
+        message: "Invalid region",
       });
     }
 
@@ -333,8 +334,9 @@ exports.updateCustomer = async (req, res) => {
       ...(region && { region }),
       ...(annualRevenue !== undefined && { annualRevenue: annualRevenue ? Number(annualRevenue) : null }),
       ...(employeeCount !== undefined && { employeeCount: employeeCount ? parseInt(employeeCount) : null }),
-      ...(accountOwnerId !== undefined && { accountOwnerId }),
-      ...(parentAccountId !== undefined && { parentAccountId }),
+      ...(accountOwnerId !== undefined && { accountOwnerId: accountOwnerId || null }),
+      ...(parentAccountId !== undefined && { parentAccountId: parentAccountId || null }),
+      ...(accountType !== undefined && { accountType: accountType || null }),
       ...(formattedTags && { tags: formattedTags }),
     };
 

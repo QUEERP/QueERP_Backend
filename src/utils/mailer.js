@@ -23,9 +23,9 @@ const sendResetEmail = async (toEmail, userName, resetToken) => {
   const resetLink = `${frontEndUrl}/reset-password?token=${resetToken}`;
 
   const mailOptions = {
-    from: `"DeltaLedger" <${process.env.SMTP_USER}>`,
+    from: `"QueErp" <${process.env.SMTP_USER}>`,
     to: toEmail,
-    subject: "Reset Your DeltaLedger Password",
+    subject: "Reset Your QueErp Password",
     text: `Hello ${userName},\n\nWe received a request to reset your password.\n\nClick the link below to reset your password:\n${resetLink}\n\nThis link will expire in 1 hour.\n\nIf you did not request this, simply ignore this email.`,
     html: `
       <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
