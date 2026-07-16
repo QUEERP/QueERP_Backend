@@ -11,9 +11,15 @@ const { createStockMovement } = require("../inventory/movement.service");
 const deductStock = async (tx, businessId, items, isFromReservation = false) => {
   let totalCogs = 0;
   let totalGrossProfit = 0;
-
   for (const item of items) {
     if (!item.productId) continue;
+
+    const product = await tx.product.findUnique({
+      where: { id: item.productId },
+      select: { type: true }
+    });
+
+    if (product?.type === 'SERVICE') continue;
 
     const stockRecord = await tx.stock.findFirst({
       where: {
@@ -97,7 +103,7 @@ const createInvoice = async (businessId, userId, userEmail, data) => {
     const invoiceNumber = await generateDocNumber(tx, businessId, "INV", "invoice", "invoiceNumber");
 
     // 2. Compute pricing
-    const pricing = calculatePricing(data.items);
+    const pricing = calculatePricing(data.items, Number(data.discount || 0), Number(data.tax || 0));
 
     // 3. Process invoice items with backward compatibility fields (hours, rate, amount)
     const processedItems = pricing.processedItems.map((item) => {
@@ -113,8 +119,9 @@ const createInvoice = async (businessId, userId, userEmail, data) => {
         sgstPercent: Number(orig.sgstPercent || item.sgstPercent || 0),
         igstPercent: Number(orig.igstPercent || item.igstPercent || 0)
       };
-      // Remove any leftover productId field
+      // Remove any leftover relation fields that must be explicitly connected
       delete base.productId;
+      delete base.warehouseId;
       if (item.productId) {
         base.product = { connect: { id: item.productId } };
       }
@@ -349,7 +356,7 @@ const updateInvoice = async (businessId, userId, userEmail, invoiceId, data) => 
       await restoreStock(tx, businessId, existing.items);
 
       // Compute pricing
-      pricing = calculatePricing(data.items);
+      pricing = calculatePricing(data.items, Number(data.discount || 0), Number(data.tax || 0));
 
       // Process invoice items
       const processedItems = pricing.processedItems.map((item) => {
@@ -365,8 +372,9 @@ const updateInvoice = async (businessId, userId, userEmail, invoiceId, data) => 
           sgstPercent: Number(orig.sgstPercent || item.sgstPercent || 0),
           igstPercent: Number(orig.igstPercent || item.igstPercent || 0)
         };
-        // Remove productId field regardless of its value
+        // Remove relation fields that must be connected
         delete base.productId;
+        delete base.warehouseId;
         if (item.productId) {
           base.product = { connect: { id: item.productId } };
         }

@@ -79,21 +79,8 @@ module.exports = async ({
     //////////////////////////////////////////////////////
     // UPLOAD TO CLOUDINARY
     //////////////////////////////////////////////////////
-    const upload = await new Promise((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream(
-        {
-          resource_type: "raw",
-          public_id: `credit-note-pdfs/${creditNumber}`,
-          format: "pdf",
-        },
-        (err, result) => {
-          if (err) return reject(err);
-          resolve(result);
-        }
-      );
-
-      stream.end(pdfBuffer);
-    });
+    const pdfWorkflow = require("./pdfWorkflow");
+    const secureUrl = await pdfWorkflow(pdfBuffer, creditNumber, "credit-note-pdfs");
 
     //////////////////////////////////////////////////////
     // SAVE URL
@@ -101,7 +88,7 @@ module.exports = async ({
     const updated = await prisma.creditNote.update({
       where: { id: credit.id },
       data: {
-        pdfUrl: upload.secure_url,
+        pdfUrl: secureUrl,
       },
       include: {
         customer: true,

@@ -97,7 +97,7 @@ model Business {
   //   EmailLog            EmailLog[]
   employees           Employee[]
   expenses            Expense[]
-  //   journalEntries      JournalEntry[]
+  journalEntries      JournalEntry[]
   leads               Lead[]
   //   LeadConversionLog   LeadConversionLog[]
   //   Note                Note[]
@@ -1839,7 +1839,23 @@ model Account {
   createdAt DateTime @default(now())
 
   business Business @relation(fields: [businessId], references: [id])
-  //   entries    JournalEntry[]
+  entries    JournalEntry[]
+}
+
+model JournalEntry {
+  id         String   @id @default(uuid())
+  businessId String
+  accountId  String
+  debit      Float    @default(0)
+  credit     Float    @default(0)
+  description String?
+  date       DateTime @default(now())
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  account    Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
 }
 
 // model stock_transfer_items {
@@ -3082,29 +3098,112 @@ model ProjectRequirement {
   contactId          String?
   businessType       String?
   department         String?
-  categoryId         String?
+  industry           String?
   priority           String?
+  
+  // Project Economics
+  projectSize        String?
   expectedBudget     Float?
-  expectedTimeline   String?
+  estimatedCost      Float?
+  expectedRevenue    Float?
+  expectedProfit     Float?
+  expectedMargin     Float?
+  budgetRange        String?
+  billingModel       String?
+  paymentTerms       String?
+
   assignedEmployeeId String?
   description        String?  @db.Text
   tags               String[]
   source             String?
   location           String?
-  status             String   @default("New")
+  status             String   @default("Draft")
 
   projectType   String?
   executionType String?
   currency      String?
   country       String?
   timezone      String?
+  
+  // Customer Contact Addition
+  website                String?
+  preferredCommunication String?
+  
+  // Business Requirements (BRS)
+  businessObjective       String? @db.Text
+  currentProblem          String? @db.Text
+  coreBusinessRequirement String? @db.Text
+  expectedSolution        String? @db.Text
+  inScope                 String? @db.Text
+  outOfScope              String? @db.Text
+  successCriteria         String? @db.Text
+  assumptionsDependencies String? @db.Text
+  existingProcess         String? @db.Text
+  futureProcess           String? @db.Text
+  businessRules           String? @db.Text
+  constraints             String? @db.Text
+  acceptanceCriteria      String? @db.Text
+  brsRisks                String? @db.Text
+  brsDependencies         String? @db.Text
+
+  // Technical / Operational Requirements
+  technologyStack          String? @db.Text
+  thirdPartyIntegrations   String? @db.Text
+  apiDataRequirements      String? @db.Text
+  securityCompliance       String? @db.Text
+  hostingPreference        String?
+  performanceRequirement   String? @db.Text
+  infrastructureRequirements String? @db.Text
+  hardwareRequirements     String? @db.Text
+  networkRequirements      String? @db.Text
+  authentication           String? @db.Text
+  authorization            String? @db.Text
+  database                 String?
+  browserSupport           String?
+  mobileSupport            String?
+  backupStrategy           String? @db.Text
+  disasterRecovery         String? @db.Text
+  complianceRequirements   String? @db.Text
+
+  // Timeline & Schedule
+  requirementDate   DateTime?
+  expectedStart     DateTime?
+  expectedEnd       DateTime?
+  decisionDeadline  DateTime?
+  targetGoLive      DateTime?
+  estimatedDuration String?
+  actualStartDate   DateTime?
+  actualEndDate     DateTime?
+  warrantyEndDate   DateTime?
+  supportEndDate    DateTime?
+
+  // Risk Assessment
+  overallRisk                String?
+  technicalRisk              String?
+  businessRisk               String?
+  budgetRisk                 String?
+  timelineRisk               String?
+  dependencyRisk             String?
+  managementApprovalRequired Boolean @default(false)
+  mitigationPlan             String? @db.Text
+
+  // Internal Notes
+  salesObservations        String? @db.Text
+  requirementAnalysisNotes String? @db.Text
+  managementApprovalNotes  String? @db.Text
+  implementationNotes      String? @db.Text
+  supportNotes             String? @db.Text
+
   deliverables  Json?
   team          Json?
+  attachments   Json?
+  
   contactPerson String?
   email         String?
   phone         String?
   company       String?
-  createdBy     String? // Added createdBy field
+  completionPercentage Float?
+  createdBy     String? 
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

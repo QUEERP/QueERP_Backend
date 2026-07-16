@@ -78,7 +78,8 @@ exports.getStockValuation = async (req, res) => {
   try {
     const stocks = await prisma.stock.findMany({
       where: {
-        warehouse: { businessId: req.business.id }
+        warehouse: { businessId: req.business.id },
+        product: { type: 'GOODS' }
       },
       include: {
         product: {
@@ -127,7 +128,8 @@ exports.getLowStockAlerts = async (req, res) => {
   try {
     const stocks = await prisma.stock.findMany({
       where: {
-        warehouse: { businessId: req.business.id }
+        warehouse: { businessId: req.business.id },
+        product: { type: 'GOODS' }
       },
       include: {
         product: true,
@@ -159,7 +161,7 @@ exports.getLowStockAlerts = async (req, res) => {
 exports.getMovementSummary = async (req, res) => {
   try {
     const movements = await prisma.stockMovement.findMany({
-      where: { businessId: req.business.id }
+      where: { businessId: req.business.id, product: { type: 'GOODS' } }
     });
 
     const summaryMap = movements.reduce((acc, m) => {

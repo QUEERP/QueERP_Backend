@@ -11,7 +11,10 @@ exports.getNotifications = async (req, res) => {
 
     // 1. Low stock & Out of stock
     const stocks = await prisma.stock.findMany({
-      where: { warehouse: { businessId } },
+      where: { 
+        warehouse: { businessId },
+        product: { type: 'GOODS' }
+      },
       include: { product: true }
     });
 

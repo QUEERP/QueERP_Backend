@@ -170,15 +170,14 @@ exports.createPayment = async (req, res) => {
           settings
         );
 
-        if (pdfBuffer2) {
-          const pdfUrl2 = await uploadPaymentPdf(pdfBuffer2, result.payment.id);
-          result.payment = await prisma.payment.update({
-            where: { id: result.payment.id },
-            data: { pdfUrl: pdfUrl2 },
-          });
-        }
+        const pdfUrl2 = await uploadPaymentPdf(pdfBuffer2, result.payment.id);
+        result.payment = await prisma.payment.update({
+          where: { id: result.payment.id },
+          data: { pdfUrl: pdfUrl2 },
+        });
+        console.log("[Payment PDF] Saved pdfUrl for payment", result.payment.id);
       } catch (pdfError) {
-        console.error("Invoice Payment PDF generation failed:", pdfError);
+        console.error("[Payment PDF] Invoice payment PDF generation failed:", pdfError.message);
       }
 
       return successResponse(

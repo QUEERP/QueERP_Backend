@@ -7,7 +7,7 @@ module.exports = async (req, res, next) => {
     //////////////////////////////////////////////////////
     // 1️⃣ READ BUSINESS FROM HEADER
     //////////////////////////////////////////////////////
-    const businessId = req.headers["x-business-id"];
+    const businessId = req.headers["x-business-id"] || req.query["x-business-id"];
 
     if (!businessId) {
       return res.status(400).json({

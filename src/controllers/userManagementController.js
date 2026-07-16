@@ -42,6 +42,72 @@ const getBusinessUsers = async (req, res) => {
 };
 
 //////////////////////////////////////////////////////
+// CREATE NEW USER & ADD TO BUSINESS
+//////////////////////////////////////////////////////
+const bcrypt = require("bcryptjs");
+
+const createUser = async (req, res) => {
+  try {
+    const { name, email, password, roleName } = req.body;
+    const businessId = req.business.id;
+
+    if (!name || !email || !password) {
+      return errorResponse(res, "Name, email, and password are required", 400);
+    }
+
+    let user = await prisma.user.findUnique({ where: { email } });
+
+    if (user) {
+      const existingMembership = await prisma.businessUser.findUnique({
+        where: {
+          userId_businessId: { userId: user.id, businessId },
+        },
+      });
+
+      if (existingMembership) {
+        return errorResponse(res, "User already exists in business", 400);
+      }
+    } else {
+      const hashedPassword = await bcrypt.hash(password, 10);
+      user = await prisma.user.create({
+        data: {
+          name,
+          email,
+          password: hashedPassword,
+        },
+      });
+    }
+
+    const roleToFind = roleName || "User";
+    const role = await prisma.role.findFirst({
+      where: { businessId, name: roleToFind },
+    });
+
+    if (!role) {
+      return errorResponse(res, `Role '${roleToFind}' not found.`, 400);
+    }
+
+    const membership = await prisma.businessUser.create({
+      data: {
+        userId: user.id,
+        businessId,
+        roleId: role.id,
+        isActive: true,
+      },
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+        role: true,
+      },
+    });
+
+    return successResponse(res, membership, "User created and added successfully");
+  } catch (error) {
+    console.error("createUser error:", error);
+    return errorResponse(res, "Internal server error", 500);
+  }
+};
+
+//////////////////////////////////////////////////////
 // INVITE USER TO BUSINESS
 //////////////////////////////////////////////////////
 const inviteUser = async (req, res) => {
@@ -251,6 +317,7 @@ const cancelInvite = async (req, res) => {
 
 module.exports = {
   getBusinessUsers,
+  createUser,
   inviteUser,
   toggleUserStatus,
   assignDirectPermission,

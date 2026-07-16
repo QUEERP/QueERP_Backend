@@ -2,7 +2,7 @@ const prisma = require("../../config/prisma");
 
 const getStockLevels = async (businessId, query = {}) => {
   const where = {
-    product: { businessId }
+    product: { businessId, type: 'GOODS' }
   };
 
   if (query.productId) {
