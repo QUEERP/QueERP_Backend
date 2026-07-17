@@ -9,9 +9,20 @@ exports.createVendor = async (req, res) => {
 
     const {
       name,
+      vendorType,
+      contactPerson,
       email,
+      countryCode,
       phone,
       vatNumber,
+      taxRegistrationNumber,
+      paymentTerms,
+      currency,
+      openingBalance,
+      creditLimit,
+      preferredVendor,
+      notes,
+      status,
       website,
       address,
       city,
@@ -31,15 +42,33 @@ exports.createVendor = async (req, res) => {
     }
 
     //////////////////////////////////////////////////////
+    // VENDOR CODE GENERATION
+    //////////////////////////////////////////////////////
+    const vendorCount = await prisma.vendor.count({ where: { businessId } });
+    const vendorCode = `VEN-${String(vendorCount + 1).padStart(4, '0')}`;
+
+    //////////////////////////////////////////////////////
     // CREATE
     //////////////////////////////////////////////////////
     const vendor = await prisma.vendor.create({
       data: {
         businessId,
+        vendorCode,
         name,
+        vendorType,
+        contactPerson,
         email,
+        countryCode,
         phone,
         vatNumber,
+        taxRegistrationNumber,
+        paymentTerms,
+        currency,
+        openingBalance: openingBalance ? parseFloat(openingBalance) : 0,
+        creditLimit: creditLimit ? parseFloat(creditLimit) : null,
+        preferredVendor: preferredVendor || false,
+        notes,
+        status: status || 'ACTIVE',
         website,
         address,
         city,
@@ -69,24 +98,49 @@ exports.createVendor = async (req, res) => {
 exports.getVendors = async (req, res) => {
   try {
     const businessId = req.business.id;
-    const { search = "" } = req.query;
+    const { search = "", page = 1, limit = 10, vendorType, status } = req.query;
 
-    const vendors = await prisma.vendor.findMany({
-      where: {
-        businessId,
-        name: {
-          contains: search,
-          mode: "insensitive",
+    const skip = (Number(page) - 1) * Number(limit);
+    const take = Number(limit);
+
+    const where = {
+      businessId,
+    };
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: "insensitive" } },
+        { email: { contains: search, mode: "insensitive" } },
+        { phone: { contains: search, mode: "insensitive" } },
+        { vendorCode: { contains: search, mode: "insensitive" } }
+      ];
+    }
+
+    if (vendorType && vendorType !== "ALL") {
+      where.vendorType = vendorType;
+    }
+
+    if (status && status !== "ALL") {
+      where.status = status;
+    }
+
+    const [vendors, total] = await Promise.all([
+      prisma.vendor.findMany({
+        where,
+        skip,
+        take,
+        orderBy: {
+          createdAt: "desc",
         },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+      }),
+      prisma.vendor.count({ where })
+    ]);
 
     res.json({
       success: true,
-      data: vendors,
+      vendors,
+      total,
+      totalPages: Math.ceil(total / take),
     });
 
   } catch (error) {
@@ -164,12 +218,24 @@ exports.updateVendor = async (req, res) => {
     //////////////////////////////////////////////////////
     // UPDATE (SAFE)
     //////////////////////////////////////////////////////
+    const updateData = { ...req.body };
+    if (updateData.openingBalance !== undefined) {
+      updateData.openingBalance = updateData.openingBalance ? parseFloat(updateData.openingBalance) : 0;
+    }
+    if (updateData.creditLimit !== undefined) {
+      updateData.creditLimit = updateData.creditLimit ? parseFloat(updateData.creditLimit) : null;
+    }
+    
+    // Remove the fields that shouldn't be updated directly via req.body (like id, businessId)
+    delete updateData.id;
+    delete updateData.businessId;
+
     const updated = await prisma.vendor.updateMany({
       where: {
         id,
         businessId,
       },
-      data: req.body,
+      data: updateData,
     });
 
     res.json({

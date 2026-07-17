@@ -32,7 +32,10 @@ const verifyToken = (token) => {
 //////////////////////////////////////////////////////
 const extractTokenFromHeader = (req) => {
   const header = req.headers.authorization;
-  if (!header) return null;
+  if (!header) {
+    if (req.query && req.query.token) return req.query.token;
+    return null;
+  }
 
   const parts = header.split(" ");
   if (parts.length !== 2 || parts[0] !== "Bearer") return null;

@@ -9,6 +9,9 @@ const lineItemSchema = z.object({
   quantity: z.number().optional().default(0),
   price: z.number().nonnegative("Price cannot be negative").optional().default(0),
   taxPercent: z.number().nonnegative("Tax percent cannot be negative").default(0),
+  cgstPercent: z.number().nonnegative().optional().default(0),
+  sgstPercent: z.number().nonnegative().optional().default(0),
+  igstPercent: z.number().nonnegative().optional().default(0),
   taxDetails: z.array(
     z.object({
       name: z.string(),
@@ -31,6 +34,8 @@ const createQuotationSchema = z.object({
   issueDate: z.string().datetime().optional().or(z.coerce.date()).default(() => new Date()),
   expiryDate: z.string().datetime().optional().or(z.coerce.date()).nullable(),
   notes: z.string().optional().nullable(),
+  taxType: z.string().optional().nullable(),
+  gstTreatment: z.string().optional().nullable(),
   items: z.array(lineItemSchema).min(1, "At least one line item is required")
 });
 
@@ -46,6 +51,8 @@ const updateQuotationSchema = z.object({
   issueDate: z.coerce.date().optional(),
   expiryDate: z.coerce.date().nullable().optional(),
   notes: z.string().optional().nullable(),
+  taxType: z.string().optional().nullable(),
+  gstTreatment: z.string().optional().nullable(),
   items: z.array(lineItemSchema).min(1).optional()
 });
 

@@ -5,7 +5,7 @@ const prisma = require("../../config/prisma");
  * Returns total inventory value (qty × costPrice) per product per warehouse
  */
 const getStockValuation = async (businessId, query = {}) => {
-  const where = { product: { businessId } };
+  const where = { product: { businessId, type: "GOODS" } };
   if (query.warehouseId) where.warehouseId = query.warehouseId;
   if (query.productId) where.productId = query.productId;
 
@@ -100,7 +100,7 @@ const getLowStockAlerts = async (businessId, query = {}) => {
  * Returns aggregated movement totals by type within a date range
  */
 const getMovementSummary = async (businessId, query = {}) => {
-  const where = { businessId };
+  const where = { businessId, product: { type: "GOODS" } };
 
   if (query.startDate || query.endDate) {
     where.createdAt = {};
@@ -133,7 +133,7 @@ const getMovementDetail = async (businessId, query = {}) => {
   const limit = parseInt(query.limit) || 20;
   const skip = (page - 1) * limit;
 
-  const where = { businessId };
+  const where = { businessId, product: { type: "GOODS" } };
   if (query.startDate || query.endDate) {
     where.createdAt = {};
     if (query.startDate) where.createdAt.gte = new Date(query.startDate);

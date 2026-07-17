@@ -1,32 +1,18 @@
-const puppeteer = require("puppeteer-core");
-const chromium = require("@sparticuz/chromium");
+const { htmlToPdfBuffer } = require("./launchBrowser");
 
+/**
+ * Generic HTML-to-PDF generator (used by ledger, credit notes, etc.)
+ * @param {string} html
+ * @returns {Promise<Buffer>}
+ */
 module.exports = async (html) => {
-  let browser;
   try {
-    const execPath = process.env.NODE_ENV !== "production"
-      ? (process.platform === "win32"
-          ? "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
-          : "/usr/bin/google-chrome")
-      : await chromium.executablePath();
-
-    browser = await puppeteer.launch({
-      headless: chromium.headless,
-      executablePath: execPath,
-      args: chromium.args,
-    });
-
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "networkidle0" });
-
-    const pdfBuffer = await page.pdf({ format: "A4", printBackground: true });
-    console.log("✅ PDF size:", pdfBuffer?.length, "bytes");
-    return pdfBuffer;
-
+    console.log("[generatePdf] Starting...");
+    const buffer = await htmlToPdfBuffer(html);
+    console.log("[generatePdf] Done, buffer size:", buffer.length);
+    return buffer;
   } catch (err) {
-    console.error("❌ PDF error:", err.message);
+    console.error("[generatePdf] Error:", err.stack || err.message);
     throw err;
-  } finally {
-    if (browser) await browser.close();
   }
 };

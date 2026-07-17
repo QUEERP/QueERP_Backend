@@ -3,7 +3,7 @@ const InventoryService = require("./inventoryService");
 
 class ProductWorkflow {
   static async createProduct(params) {
-    const { businessId, name, sku, description, price, costPrice, hsnCode, taxPercent, unit, initialQty, warehouseId, performedBy } = params;
+    const { businessId, name, sku, description, price, costPrice, hsnCode, taxPercent, unit, initialQty, warehouseId, performedBy, type } = params;
 
     return await prisma.$transaction(async (tx) => {
       // 1. Create product record
@@ -18,15 +18,12 @@ class ProductWorkflow {
           taxCode: hsnCode || null,
           taxPercent: Number(taxPercent || 0),
           unit: unit || 'pcs',
-          type: 'GOODS'
+          type: type || 'GOODS'
         }
       });
 
       // 2. Handle initial stock if quantity and warehouse are provided
-      if (initialQty && Number(initialQty) > 0) {
-        if (!warehouseId) {
-          throw new Error("Warehouse ID is required when specifying an initial quantity.");
-        }
+      if (initialQty && Number(initialQty) > 0 && warehouseId) {
 
         // Verify warehouse exists within business context
         const warehouseExists = await tx.warehouse.findFirst({

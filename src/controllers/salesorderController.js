@@ -101,18 +101,24 @@ exports.createSalesOrder = async (req, res) => {
         totalTaxAmount += taxResult.totalTaxAmount;
 
         // Warehouse-wise stock validation & Reservation
-        if (item.productId && item.warehouseId) {
-          await InventoryService.reserveStock({
-            productId: item.productId,
-            warehouseId: item.warehouseId,
-            quantity: Number(item.quantity),
-            tx
-          });
+        const resolvedItemType = item.itemType || item.type || 'GOODS';
+        if (resolvedItemType === 'GOODS') {
+          if (!item.warehouseId) {
+            throw new Error(`Warehouse is required for goods item: ${item.name || item.description}`);
+          }
+          if (item.productId) {
+            await InventoryService.reserveStock({
+              productId: item.productId,
+              warehouseId: item.warehouseId,
+              quantity: Number(item.quantity),
+              tx
+            });
+          }
         }
 
         mappedItems.push({
-          productId: item.productId,
-          warehouseId: item.warehouseId,
+          productId: item.productId || null,
+          warehouseId: item.warehouseId || null,
           description: item.description || item.name,
           itemType: item.itemType || item.type || 'GOODS',
           hsnSacCode: item.hsnSacCode || item.hsn,
@@ -361,8 +367,8 @@ exports.updateSalesOrder = async (req, res) => {
           totalTaxAmount += taxResult.totalTaxAmount;
 
           mappedItems.push({
-            productId: item.productId,
-            warehouseId: item.warehouseId,
+            productId: item.productId || null,
+            warehouseId: item.warehouseId || null,
             description: item.description || item.name,
             itemType: item.itemType || 'GOODS',
             hsnSacCode: item.hsnSacCode,

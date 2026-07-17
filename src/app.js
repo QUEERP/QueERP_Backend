@@ -4,6 +4,7 @@ const cors = require("cors");
 
 const authRoutes = require("./routes/authRoutes");
 const businessRoutes = require("./routes/businessRoutes");
+const countryRoutes = require("./routes/countryRoutes");
 const customerRoutes = require("./routes/customerRoutes");
 const invoiceRoutes = require("./routes/invoiceRoutes");
 const subscriptionRoutes = require("./routes/subscriptionRoutes");
@@ -109,6 +110,7 @@ app.use(express.json());
 app.use("/api/auth", authRoutes);
 app.use("/api/business", businessRoutes);
 app.use("/api/purchase", purchaseRoutes);
+app.use("/api/countries", countryRoutes);
 app.use("/api/customers", customerRoutes);
 app.use("/api/invoices", invoiceRoutes);
 app.use("/api/subscriptions", subscriptionRoutes);

@@ -417,3 +417,37 @@ exports.deletePayroll = async (req, res) => {
     });
   }
 };
+
+//////////////////////////////////////////////////////
+// DOWNLOAD PAYSLIP PDF
+//////////////////////////////////////////////////////
+exports.downloadPayslipPdf = async (req, res) => {
+  try {
+    const payslip = await prisma.payslip.findUnique({ where: { id: req.params.id } });
+
+    if (!payslip?.pdfUrl) {
+      return res.status(404).json({ success: false, message: "PDF not found" });
+    }
+
+    const https = require('https');
+    
+    https.get(payslip.pdfUrl, (pdfRes) => {
+      if (pdfRes.statusCode !== 200) {
+        return res.status(pdfRes.statusCode).json({ success: false, message: "Failed to fetch PDF from storage" });
+      }
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="Payslip_${payslip.employeeName.replace(/\s+/g, '_')}_${payslip.id}.pdf"`);
+      
+      pdfRes.pipe(res);
+    }).on('error', (err) => {
+      console.error("downloadPayslipPdf proxy error:", err);
+      res.status(500).json({ success: false, message: "Failed to download PDF" });
+    });
+  } catch (err) {
+    console.error("downloadPayslipPdf controller error:", err);
+    if (!res.headersSent) {
+      return res.status(500).json({ success: false, message: err.message });
+    }
+  }
+};
