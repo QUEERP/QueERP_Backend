@@ -624,10 +624,26 @@ exports.downloadInvoicePdf = async (req, res) => {
       return res.status(404).json({ success: false, message: "PDF not found" });
     }
 
-    return res.redirect(invoice.pdfUrl);
+    const https = require('https');
+    
+    https.get(invoice.pdfUrl, (pdfRes) => {
+      if (pdfRes.statusCode !== 200) {
+        return res.status(pdfRes.statusCode).json({ success: false, message: "Failed to fetch PDF from storage" });
+      }
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="Invoice_${invoice.invoiceNumber || id}.pdf"`);
+      
+      pdfRes.pipe(res);
+    }).on('error', (err) => {
+      console.error("downloadInvoicePdf proxy error:", err);
+      res.status(500).json({ success: false, message: "Failed to download PDF" });
+    });
   } catch (err) {
     console.error("downloadInvoicePdf controller error:", err);
-    return res.status(500).json({ success: false, message: err.message });
+    if (!res.headersSent) {
+      return res.status(500).json({ success: false, message: err.message });
+    }
   }
 };
 

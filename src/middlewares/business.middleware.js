@@ -19,22 +19,42 @@ module.exports = async (req, res, next) => {
     //////////////////////////////////////////////////////
     // 2️⃣ CHECK MEMBERSHIP
     //////////////////////////////////////////////////////
-    const membership = await prisma.businessUser.findUnique({
-      where: {
-        userId_businessId: {
+    let membership = null;
+
+    if (userId === "subscription-admin" || req.user.role === "SUPER_ADMIN") {
+      const business = await prisma.business.findUnique({
+        where: { id: businessId },
+        include: {
+          subscription: true,
+        },
+      });
+
+      if (business) {
+        membership = {
           userId,
           businessId,
-        },
-      },
-      include: {
-        role: true,
-        business: {
-          include: {
-            subscription: true,
+          role: { name: "SUPER_ADMIN" },
+          business,
+        };
+      }
+    } else {
+      membership = await prisma.businessUser.findUnique({
+        where: {
+          userId_businessId: {
+            userId,
+            businessId,
           },
         },
-      },
-    });
+        include: {
+          role: true,
+          business: {
+            include: {
+              subscription: true,
+            },
+          },
+        },
+      });
+    }
 
     if (!membership) {
       return res.status(403).json({

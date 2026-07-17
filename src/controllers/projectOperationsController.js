@@ -300,6 +300,18 @@ exports.createProject = async (req, res) => {
       }
     }
 
+    if (data.budget !== undefined && data.budget !== null) {
+      data.budget = parseFloat(data.budget) || 0;
+    }
+    
+    if (data.startDate) {
+      data.startDate = new Date(data.startDate).toISOString();
+    }
+    
+    if (data.endDate) {
+      data.endDate = new Date(data.endDate).toISOString();
+    }
+
     const projCount = await prisma.project.count({ where: { businessId: req.business.id } });
     const projectCode = `PRJ-${String(projCount + 1).padStart(5, '0')}`;
 
@@ -313,7 +325,15 @@ exports.createProject = async (req, res) => {
     });
     res.json({ success: true, project });
   } catch (err) {
-    res.status(400).json({ success: false, message: err.message });
+    console.error("Create Project Error:", err);
+    let errorMessage = "Failed to create project. Please check your inputs.";
+    if (err.message && err.message.includes('Invalid `prisma')) {
+       const match = err.message.match(/argument `.*?`: (.*)/i);
+       if (match) errorMessage = match[0];
+    } else if (err.message) {
+       errorMessage = err.message;
+    }
+    res.status(400).json({ success: false, message: errorMessage });
   }
 };
 

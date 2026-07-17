@@ -33,6 +33,36 @@ exports.getMyData = async (req, res) => {
     const userId = req.user.userId;
 
     //////////////////////////////////////////////////////
+    // SUPER ADMIN OVERRIDE
+    //////////////////////////////////////////////////////
+    if (userId === "subscription-admin" || req.user.role === "SUPER_ADMIN") {
+      const allBusinesses = await prisma.business.findMany({
+        include: {
+          settings: true,
+          customers: true,
+          invoices: {
+            include: { customer: true },
+            orderBy: { createdAt: "desc" },
+          },
+          users: {
+            include: {
+              user: { select: { id: true, name: true, email: true } },
+              role: { include: { rolePermissions: { include: { permission: true } } } },
+              userPermissions: { include: { permission: true } },
+            },
+          },
+        },
+      });
+
+      return res.status(200).json({
+        success: true,
+        user: { name: "Super Admin", role: "SUPER_ADMIN", isActive: true },
+        ownedBusinesses: allBusinesses,
+        memberBusinesses: [],
+      });
+    }
+
+    //////////////////////////////////////////////////////
     // 1️⃣ LOGIN USER
     //////////////////////////////////////////////////////
     const user = await prisma.user.findUnique({

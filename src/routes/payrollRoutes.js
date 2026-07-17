@@ -68,4 +68,16 @@ router.delete(
   payrollController.deletePayroll
 );
 
+//////////////////////////////////////////////////////
+// DOWNLOAD PAYSLIP PDF
+//////////////////////////////////////////////////////
+router.get(
+  "/payslip/:id/download-pdf",
+  authMiddleware,
+  businessMiddleware,
+  checkBusinessSubscription,
+  checkPermission("Payroll", "read"),
+  payrollController.downloadPayslipPdf
+);
+
 module.exports = router;

@@ -154,6 +154,84 @@ exports.getNotifications = async (req, res) => {
       });
     });
 
+    // 7. Pending Leaves
+    const pendingLeaves = await prisma.leave.findMany({
+      where: {
+        businessId,
+        status: 'PENDING'
+      },
+      include: { employee: true }
+    });
+    pendingLeaves.forEach(leave => {
+      notifications.push({
+        id: `leave-${leave.id}`,
+        type: 'info',
+        title: 'Pending Leave Request',
+        message: `${leave.employee?.name || 'An employee'} requested ${leave.duration === 'HALF' ? 'Half Day' : 'Full Day'} leave on ${leave.date.toLocaleDateString()}.`,
+        link: `/dashboard/${businessId}/approvals`,
+        date: leave.createdAt ? leave.createdAt.toISOString() : new Date().toISOString(),
+        module: 'hr'
+      });
+    });
+
+    // 8. Pending Bank Change Requests
+    const pendingBankChanges = await prisma.bankChangeRequest.findMany({
+      where: {
+        employee: { businessId },
+        status: 'PENDING'
+      },
+      include: { employee: true }
+    });
+    pendingBankChanges.forEach(req => {
+      notifications.push({
+        id: `bank-${req.id}`,
+        type: 'info',
+        title: 'Bank Change Request',
+        message: `${req.employee?.name || 'An employee'} requested a bank detail change.`,
+        link: `/dashboard/${businessId}/approvals`,
+        date: req.createdAt ? req.createdAt.toISOString() : new Date().toISOString(),
+        module: 'hr'
+      });
+    });
+
+    // 9. Pending Quotations
+    const pendingQuotations = await prisma.quotation.findMany({
+      where: {
+        businessId,
+        status: 'DRAFT'
+      }
+    });
+    pendingQuotations.forEach(q => {
+      notifications.push({
+        id: `quote-${q.id}`,
+        type: 'warning',
+        title: 'Quotation Approval Required',
+        message: `Quotation ${q.quotationNumber} is pending approval.`,
+        link: `/dashboard/${businessId}/approvals`,
+        date: q.createdAt ? q.createdAt.toISOString() : new Date().toISOString(),
+        module: 'sales'
+      });
+    });
+
+    // 10. Pending Sales Orders
+    const pendingSalesOrders = await prisma.salesOrder.findMany({
+      where: {
+        businessId,
+        status: 'DRAFT'
+      }
+    });
+    pendingSalesOrders.forEach(so => {
+      notifications.push({
+        id: `so-${so.id}`,
+        type: 'warning',
+        title: 'Sales Order Approval Required',
+        message: `Sales Order ${so.orderNumber} is pending approval.`,
+        link: `/dashboard/${businessId}/approvals`,
+        date: so.createdAt ? so.createdAt.toISOString() : new Date().toISOString(),
+        module: 'sales'
+      });
+    });
+
     // Sort by date descending (most urgent/recent first)
     notifications.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 

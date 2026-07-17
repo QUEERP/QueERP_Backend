@@ -26,7 +26,7 @@ exports.createPurchaseRequest = async (req, res) => {
         businessId,
         requestNumber: finalRequestNumber,
         department,
-        requesterId: req.user.userId,
+        requesterId: req.membership?.id || null,
         status,
         notes,
         items: {
@@ -36,8 +36,6 @@ exports.createPurchaseRequest = async (req, res) => {
             description: item.description,
             quantity: Number(item.quantity) || 1,
             estimatedPrice: Number(item.estimatedPrice) || 0,
-            itemType: item.itemType || "GOODS",
-            hsnSacCode: item.hsnSacCode || null
           })).filter(i => i.productId || i.description), // Basic validation
         },
       },
