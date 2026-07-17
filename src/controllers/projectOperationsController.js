@@ -396,14 +396,28 @@ exports.updateProject = async (req, res) => {
 
 exports.createMilestone = async (req, res) => {
   try {
+    const { title, description, targetDate, completionPercentage, status, paymentWeight, ownerId } = req.body;
+    
+    if (!req.params.projectId) {
+      return res.status(400).json({ success: false, message: 'projectId is required in URL.' });
+    }
+
     const milestone = await prisma.projectMilestone.create({
       data: {
-        ...req.body,
         businessId: req.business.id,
+        projectId: req.params.projectId,
+        name: title || 'Untitled Milestone',
+        description: description || null,
+        ownerId: ownerId || null,
+        weight: parseFloat(paymentWeight) || 0,
+        dueDate: targetDate ? new Date(targetDate) : null,
+        status: status || 'Pending',
+        completion: parseFloat(completionPercentage) || 0,
       },
     });
     res.json({ success: true, milestone });
   } catch (err) {
+    console.error('Create Milestone Error:', err.message);
     res.status(400).json({ success: false, message: err.message });
   }
 };
@@ -412,6 +426,19 @@ exports.getMilestones = async (req, res) => {
   try {
     const milestones = await prisma.projectMilestone.findMany({
       where: { projectId: req.params.projectId, businessId: req.business.id },
+    });
+    res.json({ success: true, milestones });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.getGlobalMilestones = async (req, res) => {
+  try {
+    const milestones = await prisma.projectMilestone.findMany({
+      where: { businessId: req.business.id },
+      include: { owner: true, project: true },
+      orderBy: { createdAt: 'desc' }
     });
     res.json({ success: true, milestones });
   } catch (err) {
@@ -428,24 +455,63 @@ exports.createTask = async (req, res) => {
     const taskCount = await prisma.projectTask.count({ where: { businessId: req.business.id } });
     const taskNumber = `TSK-${String(taskCount + 1).padStart(5, '0')}`;
 
+    const {
+      projectId, milestoneId, title, description, priority, status,
+      assignedToId, startDate, dueDate, estimatedHours, actualHours,
+      completionPercentage, checklist, dependencies, assignedTeam
+    } = req.body;
+
+    if (!projectId) {
+      return res.status(400).json({ success: false, message: 'projectId is required.' });
+    }
+
     const task = await prisma.projectTask.create({
       data: {
-        ...req.body,
-        taskNumber,
         businessId: req.business.id,
+        projectId,
+        taskNumber,
+        title: title || 'Untitled Task',
+        description: description || null,
+        priority: priority || null,
+        status: status || 'TODO',
+        assignedToId: assignedToId || null,
+        milestoneId: milestoneId || null,
+        startDate: startDate ? new Date(startDate) : null,
+        dueDate: dueDate ? new Date(dueDate) : null,
+        estimatedHours: parseFloat(estimatedHours) || 0,
+        actualHours: parseFloat(actualHours) || 0,
+        completionPercentage: parseFloat(completionPercentage) || 0,
+        checklist: checklist || null,
+        dependencies: dependencies || null,
+        assignedTeam: assignedTeam || null,
       },
     });
     res.json({ success: true, task });
   } catch (err) {
+    console.error('Create Task Error:', err.message);
     res.status(400).json({ success: false, message: err.message });
   }
 };
+
 
 exports.getTasks = async (req, res) => {
   try {
     const tasks = await prisma.projectTask.findMany({
       where: { projectId: req.params.projectId, businessId: req.business.id },
       include: { assignedTo: true, milestone: true }
+    });
+    res.json({ success: true, tasks });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.getGlobalTasks = async (req, res) => {
+  try {
+    const tasks = await prisma.projectTask.findMany({
+      where: { businessId: req.business.id },
+      include: { assignedTo: true, project: true, milestone: true },
+      orderBy: { createdAt: 'desc' }
     });
     res.json({ success: true, tasks });
   } catch (err) {
@@ -472,13 +538,25 @@ exports.updateTask = async (req, res) => {
 exports.createIssue = async (req, res) => {
   try {
     const issueCount = await prisma.projectIssue.count({ where: { businessId: req.business.id } });
-    const issueNumber = `ISS-${String(issueCount + 1).padStart(5, '0')}`;
+    const issueCode = `ISS-${String(issueCount + 1).padStart(5, '0')}`;
+
+    const { projectId, title, description, module, severity, priority, impact, rootCause, reporterId, assigneeId, dueDate } = req.body;
 
     const issue = await prisma.projectIssue.create({
       data: {
-        ...req.body,
-        issueNumber,
         businessId: req.business.id,
+        projectId,
+        issueCode,
+        title,
+        description,
+        module,
+        severity,
+        priority,
+        impact,
+        rootCause,
+        reporterId,
+        assigneeId,
+        dueDate: dueDate ? new Date(dueDate) : null,
       },
     });
     res.json({ success: true, issue });
@@ -1884,3 +1962,134 @@ exports.getReportSummary = async (req, res) => {
   }
 };
 
+// ==========================================
+// PROJECT PLANNING / SCHEDULE MODULE
+// ==========================================
+
+exports.createPlanning = async (req, res) => {
+  try {
+    const planCount = await prisma.projectPlanning.count({ where: { businessId: req.business.id } });
+    const planCode = `PLN-${String(planCount + 1).padStart(5, '0')}`;
+
+    const {
+      projectId, planName, phase, sprint, execType, status, priority, description,
+      startDate, endDate, expectedCompletion, duration, workingDays, milestone, dependency,
+      projectManagerId, taskOwnerId, department, resources, estimatedHours, billableHours, resourceCost,
+      taskTitle, subTask, sequence, criticalTask, recurring, reminder,
+      initialProgress, currentProgress, completionPercentage, progressStatus, riskLevel,
+      estimatedCost, actualCost, variance, currency,
+      comments, privateNotes, approvals
+    } = req.body;
+
+    if (!projectId || !planName || !startDate) {
+      return res.status(400).json({ success: false, message: 'projectId, planName, and startDate are required.' });
+    }
+
+    const planning = await prisma.projectPlanning.create({
+      data: {
+        businessId: req.business.id,
+        projectId,
+        planCode,
+        planName,
+        phase: phase || null,
+        sprint: sprint || null,
+        execType: execType || null,
+        status: status || 'DRAFT',
+        priority: priority || null,
+        description: description || null,
+        startDate: startDate ? new Date(startDate) : null,
+        endDate: endDate ? new Date(endDate) : null,
+        expectedCompletion: expectedCompletion ? new Date(expectedCompletion) : null,
+        duration: duration ? parseInt(duration) : null,
+        workingDays: workingDays ? parseInt(workingDays) : null,
+        milestone: milestone || null,
+        dependency: dependency || null,
+        projectManagerId: projectManagerId || null,
+        department: department || null,
+        taskOwnerId: taskOwnerId || null,
+        resources: resources ? parseInt(resources) : null,
+        estimatedHours: parseFloat(estimatedHours) || 0,
+        billableHours: parseFloat(billableHours) || 0,
+        resourceCost: parseFloat(resourceCost) || 0,
+        taskTitle: taskTitle || null,
+        subTask: subTask || null,
+        sequence: sequence ? parseInt(sequence) : null,
+        criticalTask: criticalTask === true || criticalTask === 'true',
+        recurring: recurring === true || recurring === 'true',
+        reminder: reminder ? parseInt(reminder) : null,
+        initialProgress: parseFloat(initialProgress) || 0,
+        currentProgress: parseFloat(currentProgress) || 0,
+        completionPercentage: parseFloat(completionPercentage) || 0,
+        progressStatus: progressStatus || null,
+        riskLevel: riskLevel || null,
+        estimatedCost: parseFloat(estimatedCost) || 0,
+        actualCost: parseFloat(actualCost) || 0,
+        variance: parseFloat(variance) || 0,
+        currency: currency || null,
+        comments: comments || null,
+        privateNotes: privateNotes || null,
+        approvals: approvals || null,
+      },
+      include: { project: { select: { projectName: true, projectCode: true } } }
+    });
+
+    res.status(201).json({ success: true, planning });
+  } catch (err) {
+    console.error('Create Planning Error:', err);
+    res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+exports.getPlannings = async (req, res) => {
+  try {
+    const { projectId } = req.query;
+    const where = { businessId: req.business.id };
+    if (projectId) where.projectId = projectId;
+
+    const plannings = await prisma.projectPlanning.findMany({
+      where,
+      include: {
+        project: { select: { projectName: true, projectCode: true, id: true } }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    res.json({ success: true, plannings });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.getPlanningById = async (req, res) => {
+  try {
+    const planning = await prisma.projectPlanning.findFirst({
+      where: { id: req.params.id, businessId: req.business.id },
+      include: { project: true }
+    });
+    if (!planning) return res.status(404).json({ success: false, message: 'Planning not found.' });
+    res.json({ success: true, planning });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.updatePlanning = async (req, res) => {
+  try {
+    const planning = await prisma.projectPlanning.update({
+      where: { id: req.params.id },
+      data: req.body,
+    });
+    res.json({ success: true, planning });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+exports.deletePlanning = async (req, res) => {
+  try {
+    await prisma.projectPlanning.delete({ where: { id: req.params.id } });
+    res.json({ success: true, message: 'Planning deleted.' });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+};
