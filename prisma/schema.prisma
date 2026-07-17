@@ -41,6 +41,7 @@ model User {
   financeExpenses Expense[]       @relation("ExpenseFinance")
   projectBudgets  ProjectBudget[]
   ticketComments  TicketComment[]
+  resourceAllocations ResourceAllocation[]
 
   @@map("users")
 }
@@ -137,6 +138,7 @@ model Business {
   activeUsers         User[]            @relation("ActiveBusiness")
 
   // Phase2 relations
+  resourceAllocations    ResourceAllocation[]
   Note                   Note[]
   EmailLog               EmailLog[]
   Campaign               Campaign[]
@@ -167,6 +169,7 @@ model Business {
   projectEstimations     ProjectEstimation[]
   projectMilestones      ProjectMilestone[]
   projectTasks           ProjectTask[]
+  projectPlannings       ProjectPlanning[]
   projectMasters         ProjectMaster[]
   projectIssues          ProjectIssue[]
   projectChangeRequests  ProjectChangeRequest[]
@@ -3331,6 +3334,8 @@ model Project {
   warranties       Warranty[]
   amcs             AMC[]
   tickets          Ticket[]
+  plannings        ProjectPlanning[]
+  resourceAllocations ResourceAllocation[]
 }
 
 model ProjectMilestone {
@@ -3383,6 +3388,73 @@ model ProjectTask {
   assignedTo  User?             @relation("TaskAssignedTo", fields: [assignedToId], references: [id])
   timeEntries TimeEntry[]
   expenses    Expense[]
+  resourceAllocations ResourceAllocation[]
+}
+
+// ==========================================
+// PROJECT PLANNING / SCHEDULE MODULE
+// ==========================================
+
+model ProjectPlanning {
+  id         String @id @default(uuid())
+  businessId String
+  projectId  String
+
+  planCode   String  @unique
+  planName   String
+  phase      String?
+  sprint     String?
+  execType   String?
+  status     String  @default("DRAFT")
+  priority   String?
+  description String? @db.Text
+
+  startDate           DateTime?
+  endDate             DateTime?
+  expectedCompletion  DateTime?
+  duration            Int?
+  workingDays         Int?
+  milestone           String?
+  dependency          String?
+
+  projectManagerId    String?
+  department          String?
+  taskOwnerId         String?
+  resources           Int?
+  estimatedHours      Float @default(0)
+  billableHours       Float @default(0)
+  resourceCost        Float @default(0)
+
+  taskTitle    String?
+  subTask      String?
+  sequence     Int?
+  criticalTask Boolean @default(false)
+  recurring    Boolean @default(false)
+  reminder     Int?
+
+  initialProgress      Float @default(0)
+  currentProgress      Float @default(0)
+  completionPercentage Float @default(0)
+  progressStatus       String?
+  riskLevel            String?
+
+  estimatedCost Float   @default(0)
+  actualCost    Float   @default(0)
+  variance      Float   @default(0)
+  currency      String?
+
+  comments     String? @db.Text
+  privateNotes String? @db.Text
+  approvals    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  project  Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@index([projectId])
 }
 
 model ProjectIssue {
@@ -3757,4 +3829,29 @@ model TicketAttachment {
 
   ticket   Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+}
+
+model ResourceAllocation {
+  id                String   @id @default(uuid())
+  businessId        String
+  projectId         String
+  taskId            String?
+  employeeId        String
+  department        String?
+  role              String?
+  startDate         DateTime?
+  endDate           DateTime?
+  estimatedHours    Float    @default(0)
+  allocationPercent Float    @default(100)
+  priority          String?
+  notes             String?  @db.Text
+  status            String   @default("Active")
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  project  Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  task     ProjectTask? @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  employee User     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 }
