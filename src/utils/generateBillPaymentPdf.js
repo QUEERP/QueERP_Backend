@@ -1,41 +1,22 @@
-const puppeteer = require("puppeteer-core");
-const chromium = require("@sparticuz/chromium");
+const { htmlToPdfBuffer } = require("./launchBrowser");
 const template = require("../templates/billPaymentReceiptTemplate");
 
+/**
+ * Generate Bill Payment Receipt PDF
+ * @param {object} payment
+ * @param {object} bill
+ * @param {object} settings
+ * @returns {Promise<Buffer>}
+ */
 module.exports = async (payment, bill, settings) => {
-  let browser;
-
   try {
-    const execPath =
-      process.env.NODE_ENV !== "production"
-        ? process.platform === "win32"
-          ? "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
-          : "/usr/bin/google-chrome"
-        : await chromium.executablePath();
-
-    browser = await puppeteer.launch({
-      headless: chromium.headless,
-      executablePath: execPath,
-      args: chromium.args,
-    });
-
-    const page = await browser.newPage();
-
+    console.log("[generateBillPaymentPdf] Generating for payment:", payment?.id);
     const html = template(payment, bill, settings);
-
-    await page.setContent(html, { waitUntil: "networkidle0" });
-
-    const pdfBuffer = await page.pdf({
-      format: "A4",
-      printBackground: true,
-    });
-
-    return pdfBuffer;
-
+    const buffer = await htmlToPdfBuffer(html);
+    console.log("[generateBillPaymentPdf] Done, buffer size:", buffer.length);
+    return buffer;
   } catch (err) {
-    console.error("Bill PDF error:", err);
+    console.error("[generateBillPaymentPdf] Error:", err.stack || err.message);
     throw err;
-  } finally {
-    if (browser) await browser.close();
   }
 };

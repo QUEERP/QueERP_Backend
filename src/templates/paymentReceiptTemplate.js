@@ -21,6 +21,7 @@ module.exports = (payment, invoice, settings) => {
   let label = "Amount Remaining";
   let displayAmount = Math.abs(roundedRemaining);
   let cssClass = "danger";
+  let showFifthColumn = true;
 
   if (roundedRemaining < 0) {
     label = "Amount Credited";
@@ -29,6 +30,7 @@ module.exports = (payment, invoice, settings) => {
     label = "Settled";
     cssClass = "settled";
     displayAmount = 0;
+    showFifthColumn = false;
   }
 
   //////////////////////////////////////////////////////
@@ -303,8 +305,8 @@ module.exports = (payment, invoice, settings) => {
           <th>Invoice Number</th>
           <th>Invoice Date</th>
           <th>Invoice Amount (${symbol})</th>
-          <th>Payment Amount (${symbol})</th>
-          <th>${label}</th>
+          <th>Amount Paid (${symbol})</th>
+          ${showFifthColumn ? `<th>${label}</th>` : ""}
         </tr>
       </thead>
       <tbody>
@@ -313,11 +315,11 @@ module.exports = (payment, invoice, settings) => {
           <td>${invoiceDate}</td>
           <td>${symbol} ${Number(invoice.grandTotal).toFixed(2)}</td>
           <td>${symbol} ${Number(payment.amount).toFixed(2)}</td>
+          ${showFifthColumn ? `
           <td class="${cssClass}">
-            ${label === "Settled"
-              ? "✔ Settled"
-              : `${symbol} ${displayAmount.toFixed(2)}`}
+            ${symbol} ${displayAmount.toFixed(2)}
           </td>
+          ` : ""}
         </tr>
       </tbody>
     </table>

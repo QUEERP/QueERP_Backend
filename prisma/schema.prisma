@@ -40,10 +40,12 @@ model User {
   managedExpenses Expense[]       @relation("ExpenseManager")
   financeExpenses Expense[]       @relation("ExpenseFinance")
   projectBudgets  ProjectBudget[]
+  ticketComments  TicketComment[]
+  resourceAllocations ResourceAllocation[]
 
   @@map("users")
-  ticketComments TicketComment[]
 }
+
 model Business {
   id        String   @id @default(uuid())
   name      String
@@ -54,7 +56,11 @@ model Business {
   country            Country   @default(INDIA)
   state              String?
   city               String?
-  currency           String    @default("INR")
+  currency           String?
+  countryCode        String?
+  currencyCode       String?
+  currencySymbol     String?
+  taxType            String?
   gstNumber          String?
   vatNumber          String?
   financialYearStart DateTime?
@@ -92,7 +98,7 @@ model Business {
   //   EmailLog            EmailLog[]
   employees           Employee[]
   expenses            Expense[]
-  //   journalEntries      JournalEntry[]
+  journalEntries      JournalEntry[]
   leads               Lead[]
   //   LeadConversionLog   LeadConversionLog[]
   //   Note                Note[]
@@ -132,6 +138,7 @@ model Business {
   activeUsers         User[]            @relation("ActiveBusiness")
 
   // Phase2 relations
+  resourceAllocations    ResourceAllocation[]
   Note                   Note[]
   EmailLog               EmailLog[]
   Campaign               Campaign[]
@@ -162,6 +169,7 @@ model Business {
   projectEstimations     ProjectEstimation[]
   projectMilestones      ProjectMilestone[]
   projectTasks           ProjectTask[]
+  projectPlannings       ProjectPlanning[]
   projectMasters         ProjectMaster[]
   projectIssues          ProjectIssue[]
   projectChangeRequests  ProjectChangeRequest[]
@@ -174,18 +182,19 @@ model Business {
   invoiceAuditLogs       InvoiceAuditLog[]
   documentAuditLogs      DocumentAuditLog[]
   projectBudgets         ProjectBudget[]
+  warranties             Warranty[]
+  warrantyAttachments    WarrantyAttachment[]
+  warrantyReminders      WarrantyReminder[]
+  amcs                   AMC[]
+  amcVisits              AMCVisit[]
+  amcRenewals            AMCRenewal[]
+  tickets                Ticket[]
+  ticketComments         TicketComment[]
+  ticketAttachments      TicketAttachment[]
 
   @@map("businesses")
-  warranties Warranty[]
-  warrantyAttachments WarrantyAttachment[]
-  warrantyReminders WarrantyReminder[]
-  amcs AMC[]
-  amcVisits AMCVisit[]
-  amcRenewals AMCRenewal[]
-  tickets Ticket[]
-  ticketComments TicketComment[]
-  ticketAttachments TicketAttachment[]
 }
+
 //////////////////////////////////////////////////////
 // BUSINESS USERS (User ↔ Business)
 //////////////////////////////////////////////////////
@@ -391,16 +400,17 @@ model Customer {
   recurringInvoices   RecurringInvoice[]
   projectMeetings     ProjectMeeting[]
   projectBudgets      ProjectBudget[]
+  warranties          Warranty[]
+  amcs                AMC[]
+  tickets             Ticket[]
 
   @@index([businessId])
   @@index([accountOwnerId])
   @@index([parentAccountId])
   @@index([isDeleted])
   @@map("customers")
-  warranties Warranty[]
-  amcs AMC[]
-  tickets Ticket[]
 }
+
 // enum Region {
 //   INDIA
 //   UAE
@@ -508,6 +518,7 @@ model InvoiceAuditLog {
 model InvoiceItem {
   id          String  @id @default(uuid())
   invoiceId   String
+  itemName    String?
   description String
   hsnSacCode  String?
   itemType    String?
@@ -732,10 +743,11 @@ model Employee {
   attendances        Attendance[]
   timeEntries        TimeEntry[]
   expenses           Expense[]
-  amcsAssigned AMC[] @relation("AMCEngineer")
-  amcVisits AMCVisit[]
-  ticketsAssigned Ticket[] @relation("TicketEngineer")
+  amcsAssigned       AMC[]               @relation("AMCEngineer")
+  amcVisits          AMCVisit[]
+  ticketsAssigned    Ticket[]            @relation("TicketEngineer")
 }
+
 model Attendance {
   id         String    @id @default(uuid())
   businessId String
@@ -840,11 +852,13 @@ model Expense {
   businessId    String
   title         String
   amount        Float
-  category      String
+  currency      String?  @default("AED")
+  category      String?
   paymentMethod String
   date          DateTime
   notes         String?
   vendorId      String?
+  items         ExpenseItem[]
 
   status           String  @default("Draft") // Draft, Submitted, Manager Approval, Finance Approval, Reimbursed, Rejected
   employeeId       String?
@@ -883,6 +897,23 @@ model ExpenseAuditLog {
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 }
 
+model ExpenseItem {
+  id          String   @id @default(uuid())
+  expenseId   String
+  expense     Expense  @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  itemName    String?
+  description String
+  quantity    Float?
+  rate        Float?
+  taxPercent  Float?
+  taxAmount   Float?
+  amount      Float
+  category    String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
 model Vendor {
   id String @id @default(uuid())
 
@@ -895,12 +926,16 @@ model Vendor {
   //////////////////////////////////////////////////////
   // BASIC INFO
   //////////////////////////////////////////////////////
-  name  String
-  email String?
-  phone String?
+  vendorCode    String?
+  name          String
+  vendorType    String?
+  contactPerson String?
+  email         String?
+  countryCode   String?
+  phone         String?
 
   //////////////////////////////////////////////////////
-  // COMPANY DETAILS
+  // COMPANY DETAILS (Legacy fields kept for backward compatibility)
   //////////////////////////////////////////////////////
   companyName String?
   vatNumber   String?
@@ -918,15 +953,29 @@ model Vendor {
   //////////////////////////////////////////////////////
   // STATUS
   //////////////////////////////////////////////////////
-  isActive Boolean @default(true)
-  status   String  @default("ACTIVE") // ACTIVE, INACTIVE
+  isActive        Boolean @default(true)
+  status          String  @default("ACTIVE") // ACTIVE, INACTIVE
+  preferredVendor Boolean @default(false)
 
   //////////////////////////////////////////////////////
   // DETAILS
   //////////////////////////////////////////////////////
-  paymentTerms String?
-  taxNumber    String?
-  balance      Float   @default(0)
+  taxRegistrationNumber String?
+  paymentTerms          String?
+  currency              String?
+  taxNumber             String?
+  openingBalance        Float   @default(0)
+  balance               Float   @default(0)
+  creditLimit           Float?
+  notes                 String? @db.Text
+
+  //////////////////////////////////////////////////////
+  // META
+  //////////////////////////////////////////////////////
+  createdBy String?
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   //////////////////////////////////////////////////////
   // RELATIONS
@@ -937,12 +986,6 @@ model Vendor {
   goodsReceiveNotes GoodsReceiveNote[]
   purchaseReturns   PurchaseReturn[]
   creditNotes       CreditNote[]
-
-  //////////////////////////////////////////////////////
-  // META
-  //////////////////////////////////////////////////////
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 }
 
 model CustomerContact {
@@ -1336,7 +1379,7 @@ model Quotation {
   id          String   @id @default(uuid())
   businessId  String
   business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  quoteNumber String   @unique
+  quoteNumber String
   title       String?
 
   customerId String
@@ -1389,10 +1432,10 @@ model Quotation {
   updatedAt DateTime  @updatedAt
   projects  Project[]
 
-  @@index([businessId])
   @@index([customerId])
   @@index([dealId])
   @@index([isDeleted])
+  @@unique([businessId, quoteNumber])
 }
 
 model QuotationItem {
@@ -1403,6 +1446,7 @@ model QuotationItem {
   productId String?
   product   Product? @relation(fields: [productId], references: [id])
 
+  itemName    String?
   description String
   itemType    String? @default("GOODS")
   hsnSacCode  String?
@@ -1425,7 +1469,7 @@ model SalesOrder {
   id          String   @id @default(uuid())
   businessId  String
   business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  orderNumber String   @unique
+  orderNumber String
 
   customerId String
   customer   Customer @relation(fields: [customerId], references: [id])
@@ -1485,10 +1529,10 @@ model SalesOrder {
   updatedAt DateTime  @updatedAt
   projects  Project[]
 
-  @@index([businessId])
   @@index([customerId])
   @@index([quotationId])
   @@index([isDeleted])
+  @@unique([businessId, orderNumber])
 }
 
 model SalesOrderItem {
@@ -1553,10 +1597,12 @@ model PurchaseOrder {
   //////////////////////////////////////////////////////
   // PRICING
   //////////////////////////////////////////////////////
-  subtotal    Float
-  tax         Float?
-  discount    Float?
-  totalAmount Float
+  subtotal      Float
+  tax           Float?
+  discount      Float?
+  totalAmount   Float
+  currencyCode  String?  @default("AED")
+  currencySymbol String? @default("AED")
 
   //////////////////////////////////////////////////////
   // DATES
@@ -1817,7 +1863,23 @@ model Account {
   createdAt DateTime @default(now())
 
   business Business @relation(fields: [businessId], references: [id])
-  //   entries    JournalEntry[]
+  entries    JournalEntry[]
+}
+
+model JournalEntry {
+  id         String   @id @default(uuid())
+  businessId String
+  accountId  String
+  debit      Float    @default(0)
+  credit     Float    @default(0)
+  description String?
+  date       DateTime @default(now())
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  account    Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
 }
 
 // model stock_transfer_items {
@@ -1873,6 +1935,82 @@ enum UserRole {
 enum Region {
   INDIA
   UAE
+  AFGHANISTAN
+  ALBANIA
+  ALGERIA
+  ARGENTINA
+  AUSTRALIA
+  AUSTRIA
+  BAHRAIN
+  BANGLADESH
+  BELGIUM
+  BRAZIL
+  CANADA
+  CHILE
+  CHINA
+  COLOMBIA
+  CROATIA
+  CZECH_REPUBLIC
+  DENMARK
+  EGYPT
+  ETHIOPIA
+  FINLAND
+  FRANCE
+  GERMANY
+  GHANA
+  GREECE
+  HONG_KONG
+  HUNGARY
+  INDONESIA
+  IRAN
+  IRAQ
+  IRELAND
+  ISRAEL
+  ITALY
+  JAPAN
+  JORDAN
+  KAZAKHSTAN
+  KENYA
+  KUWAIT
+  LEBANON
+  MALAYSIA
+  MEXICO
+  MOROCCO
+  MYANMAR
+  NEPAL
+  NETHERLANDS
+  NEW_ZEALAND
+  NIGERIA
+  NORWAY
+  OMAN
+  PAKISTAN
+  PHILIPPINES
+  POLAND
+  PORTUGAL
+  QATAR
+  ROMANIA
+  RUSSIA
+  SAUDI_ARABIA
+  SINGAPORE
+  SOUTH_AFRICA
+  SOUTH_KOREA
+  SPAIN
+  SRI_LANKA
+  SWEDEN
+  SWITZERLAND
+  TAIWAN
+  TANZANIA
+  THAILAND
+  TUNISIA
+  TURKEY
+  UKRAINE
+  UNITED_ARAB_EMIRATES
+  UNITED_KINGDOM
+  UNITED_STATES
+  VENEZUELA
+  VIETNAM
+  ZIMBABWE
+  OTHER
 }
 
 enum CreatorType {
@@ -2984,29 +3122,112 @@ model ProjectRequirement {
   contactId          String?
   businessType       String?
   department         String?
-  categoryId         String?
+  industry           String?
   priority           String?
+  
+  // Project Economics
+  projectSize        String?
   expectedBudget     Float?
-  expectedTimeline   String?
+  estimatedCost      Float?
+  expectedRevenue    Float?
+  expectedProfit     Float?
+  expectedMargin     Float?
+  budgetRange        String?
+  billingModel       String?
+  paymentTerms       String?
+
   assignedEmployeeId String?
   description        String?  @db.Text
   tags               String[]
   source             String?
   location           String?
-  status             String   @default("New")
+  status             String   @default("Draft")
 
   projectType   String?
   executionType String?
   currency      String?
   country       String?
   timezone      String?
+  
+  // Customer Contact Addition
+  website                String?
+  preferredCommunication String?
+  
+  // Business Requirements (BRS)
+  businessObjective       String? @db.Text
+  currentProblem          String? @db.Text
+  coreBusinessRequirement String? @db.Text
+  expectedSolution        String? @db.Text
+  inScope                 String? @db.Text
+  outOfScope              String? @db.Text
+  successCriteria         String? @db.Text
+  assumptionsDependencies String? @db.Text
+  existingProcess         String? @db.Text
+  futureProcess           String? @db.Text
+  businessRules           String? @db.Text
+  constraints             String? @db.Text
+  acceptanceCriteria      String? @db.Text
+  brsRisks                String? @db.Text
+  brsDependencies         String? @db.Text
+
+  // Technical / Operational Requirements
+  technologyStack          String? @db.Text
+  thirdPartyIntegrations   String? @db.Text
+  apiDataRequirements      String? @db.Text
+  securityCompliance       String? @db.Text
+  hostingPreference        String?
+  performanceRequirement   String? @db.Text
+  infrastructureRequirements String? @db.Text
+  hardwareRequirements     String? @db.Text
+  networkRequirements      String? @db.Text
+  authentication           String? @db.Text
+  authorization            String? @db.Text
+  database                 String?
+  browserSupport           String?
+  mobileSupport            String?
+  backupStrategy           String? @db.Text
+  disasterRecovery         String? @db.Text
+  complianceRequirements   String? @db.Text
+
+  // Timeline & Schedule
+  requirementDate   DateTime?
+  expectedStart     DateTime?
+  expectedEnd       DateTime?
+  decisionDeadline  DateTime?
+  targetGoLive      DateTime?
+  estimatedDuration String?
+  actualStartDate   DateTime?
+  actualEndDate     DateTime?
+  warrantyEndDate   DateTime?
+  supportEndDate    DateTime?
+
+  // Risk Assessment
+  overallRisk                String?
+  technicalRisk              String?
+  businessRisk               String?
+  budgetRisk                 String?
+  timelineRisk               String?
+  dependencyRisk             String?
+  managementApprovalRequired Boolean @default(false)
+  mitigationPlan             String? @db.Text
+
+  // Internal Notes
+  salesObservations        String? @db.Text
+  requirementAnalysisNotes String? @db.Text
+  managementApprovalNotes  String? @db.Text
+  implementationNotes      String? @db.Text
+  supportNotes             String? @db.Text
+
   deliverables  Json?
   team          Json?
+  attachments   Json?
+  
   contactPerson String?
   email         String?
   phone         String?
   company       String?
-  createdBy     String? // Added createdBy field
+  completionPercentage Float?
+  createdBy     String? 
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -3131,10 +3352,13 @@ model Project {
   documents        ProjectDocument[]
   meetings         ProjectMeeting[]
   projectBudget    ProjectBudget?
-  warranties Warranty[]
-  amcs AMC[]
-  tickets Ticket[]
+  warranties       Warranty[]
+  amcs             AMC[]
+  tickets          Ticket[]
+  plannings        ProjectPlanning[]
+  resourceAllocations ResourceAllocation[]
 }
+
 model ProjectMilestone {
   id          String    @id @default(uuid())
   businessId  String
@@ -3185,6 +3409,73 @@ model ProjectTask {
   assignedTo  User?             @relation("TaskAssignedTo", fields: [assignedToId], references: [id])
   timeEntries TimeEntry[]
   expenses    Expense[]
+  resourceAllocations ResourceAllocation[]
+}
+
+// ==========================================
+// PROJECT PLANNING / SCHEDULE MODULE
+// ==========================================
+
+model ProjectPlanning {
+  id         String @id @default(uuid())
+  businessId String
+  projectId  String
+
+  planCode   String  @unique
+  planName   String
+  phase      String?
+  sprint     String?
+  execType   String?
+  status     String  @default("DRAFT")
+  priority   String?
+  description String? @db.Text
+
+  startDate           DateTime?
+  endDate             DateTime?
+  expectedCompletion  DateTime?
+  duration            Int?
+  workingDays         Int?
+  milestone           String?
+  dependency          String?
+
+  projectManagerId    String?
+  department          String?
+  taskOwnerId         String?
+  resources           Int?
+  estimatedHours      Float @default(0)
+  billableHours       Float @default(0)
+  resourceCost        Float @default(0)
+
+  taskTitle    String?
+  subTask      String?
+  sequence     Int?
+  criticalTask Boolean @default(false)
+  recurring    Boolean @default(false)
+  reminder     Int?
+
+  initialProgress      Float @default(0)
+  currentProgress      Float @default(0)
+  completionPercentage Float @default(0)
+  progressStatus       String?
+  riskLevel            String?
+
+  estimatedCost Float   @default(0)
+  actualCost    Float   @default(0)
+  variance      Float   @default(0)
+  currency      String?
+
+  comments     String? @db.Text
+  privateNotes String? @db.Text
+  approvals    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  project  Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([businessId])
+  @@index([projectId])
 }
 
 model ProjectIssue {
@@ -3374,189 +3665,214 @@ model ProjectBudget {
 // WARRANTY MODULE
 // ==========================================
 model Warranty {
-  id              String    @id @default(uuid())
-  warrantyNumber  String    @unique
-  businessId      String
-  projectId       String?
-  customerId      String?
-  
-  equipment       String?
-  serialNumber    String?
-  manufacturer    String?
+  id             String  @id @default(uuid())
+  warrantyNumber String  @unique
+  businessId     String
+  projectId      String?
+  customerId     String?
+
+  equipment        String?
+  serialNumber     String?
+  manufacturer     String?
   warrantyProvider String?
-  warrantyType    String?   // STANDARD, EXTENDED, COMPREHENSIVE
-  
+  warrantyType     String? // STANDARD, EXTENDED, COMPREHENSIVE
+
   startDate       DateTime
   endDate         DateTime
-  coverageDetails String?   @db.Text
-  terms           String?   @db.Text
-  notes           String?   @db.Text
-  
-  status          String    @default("ACTIVE") // ACTIVE, EXPIRED, VOID
-  
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  coverageDetails String?  @db.Text
+  terms           String?  @db.Text
+  notes           String?  @db.Text
 
-  business        Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  project         Project?  @relation(fields: [projectId], references: [id])
-  customer        Customer? @relation(fields: [customerId], references: [id])
-  
-  attachments     WarrantyAttachment[]
-  reminders       WarrantyReminder[]
-  amcs            AMC[]
-  tickets         Ticket[]
+  status String @default("ACTIVE") // ACTIVE, EXPIRED, VOID
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  project  Project?  @relation(fields: [projectId], references: [id])
+  customer Customer? @relation(fields: [customerId], references: [id])
+
+  attachments WarrantyAttachment[]
+  reminders   WarrantyReminder[]
+  amcs        AMC[]
+  tickets     Ticket[]
 }
 
 model WarrantyAttachment {
-  id          String   @id @default(uuid())
-  warrantyId  String
-  businessId  String
-  fileName    String
-  fileUrl     String
-  uploadedAt  DateTime @default(now())
+  id         String   @id @default(uuid())
+  warrantyId String
+  businessId String
+  fileName   String
+  fileUrl    String
+  uploadedAt DateTime @default(now())
 
-  warranty    Warranty @relation(fields: [warrantyId], references: [id], onDelete: Cascade)
-  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  warranty Warranty @relation(fields: [warrantyId], references: [id], onDelete: Cascade)
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 }
 
 model WarrantyReminder {
-  id          String   @id @default(uuid())
-  warrantyId  String
-  businessId  String
+  id           String   @id @default(uuid())
+  warrantyId   String
+  businessId   String
   reminderDate DateTime
-  message     String?
-  isSent      Boolean  @default(false)
-  
-  warranty    Warranty @relation(fields: [warrantyId], references: [id], onDelete: Cascade)
-  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  message      String?
+  isSent       Boolean  @default(false)
+
+  warranty Warranty @relation(fields: [warrantyId], references: [id], onDelete: Cascade)
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 }
 
 // ==========================================
 // AMC MODULE
 // ==========================================
 model AMC {
-  id              String    @id @default(uuid())
-  amcNumber       String    @unique
-  businessId      String
-  customerId      String?
-  projectId       String?
-  warrantyId      String?
-  
-  contractValue   Float     @default(0)
-  amcType         String?   // COMPREHENSIVE, NON-COMPREHENSIVE, LABOR-ONLY
-  coverage        String?   @db.Text
-  visitFrequency  String?   // MONTHLY, QUARTERLY, BIANNUALLY, ANNUALLY
-  
-  startDate       DateTime
-  endDate         DateTime
-  renewalDate     DateTime?
-  
-  assignedEngineerId String?
-  sla             String?
-  notes           String?   @db.Text
-  
-  status          String    @default("ACTIVE") // ACTIVE, EXPIRED, RENEWED, CANCELLED
-  paymentStatus   String    @default("PENDING") // PENDING, PAID, PARTIAL
-  
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id         String  @id @default(uuid())
+  amcNumber  String  @unique
+  businessId String
+  customerId String?
+  projectId  String?
+  warrantyId String?
 
-  business        Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  customer        Customer? @relation(fields: [customerId], references: [id])
-  project         Project?  @relation(fields: [projectId], references: [id])
-  warranty        Warranty? @relation(fields: [warrantyId], references: [id])
+  contractValue  Float   @default(0)
+  amcType        String? // COMPREHENSIVE, NON-COMPREHENSIVE, LABOR-ONLY
+  coverage       String? @db.Text
+  visitFrequency String? // MONTHLY, QUARTERLY, BIANNUALLY, ANNUALLY
+
+  startDate   DateTime
+  endDate     DateTime
+  renewalDate DateTime?
+
+  assignedEngineerId String?
+  sla                String?
+  notes              String? @db.Text
+
+  status        String @default("ACTIVE") // ACTIVE, EXPIRED, RENEWED, CANCELLED
+  paymentStatus String @default("PENDING") // PENDING, PAID, PARTIAL
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  business         Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer         Customer? @relation(fields: [customerId], references: [id])
+  project          Project?  @relation(fields: [projectId], references: [id])
+  warranty         Warranty? @relation(fields: [warrantyId], references: [id])
   assignedEngineer Employee? @relation("AMCEngineer", fields: [assignedEngineerId], references: [id])
-  
-  visits          AMCVisit[]
-  renewals        AMCRenewal[]
-  tickets         Ticket[]
+
+  visits   AMCVisit[]
+  renewals AMCRenewal[]
+  tickets  Ticket[]
 }
 
 model AMCVisit {
-  id            String    @id @default(uuid())
-  amcId         String
-  businessId    String
-  visitDate     DateTime
-  engineerId    String?
-  status        String    @default("SCHEDULED") // SCHEDULED, COMPLETED, MISSED
-  notes         String?   @db.Text
-  
-  amc           AMC       @relation(fields: [amcId], references: [id], onDelete: Cascade)
-  business      Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  engineer      Employee? @relation(fields: [engineerId], references: [id])
+  id         String   @id @default(uuid())
+  amcId      String
+  businessId String
+  visitDate  DateTime
+  engineerId String?
+  status     String   @default("SCHEDULED") // SCHEDULED, COMPLETED, MISSED
+  notes      String?  @db.Text
+
+  amc      AMC       @relation(fields: [amcId], references: [id], onDelete: Cascade)
+  business Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  engineer Employee? @relation(fields: [engineerId], references: [id])
 }
 
 model AMCRenewal {
-  id            String    @id @default(uuid())
-  amcId         String
-  businessId    String
-  renewalDate   DateTime
-  amount        Float
-  status        String    @default("PENDING") // PENDING, COMPLETED
-  
-  amc           AMC       @relation(fields: [amcId], references: [id], onDelete: Cascade)
-  business      Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  id          String   @id @default(uuid())
+  amcId       String
+  businessId  String
+  renewalDate DateTime
+  amount      Float
+  status      String   @default("PENDING") // PENDING, COMPLETED
+
+  amc      AMC      @relation(fields: [amcId], references: [id], onDelete: Cascade)
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 }
 
 // ==========================================
 // SUPPORT TICKETS MODULE
 // ==========================================
 model Ticket {
-  id            String    @id @default(uuid())
-  ticketNumber  String    @unique
-  businessId    String
-  customerId    String?
-  projectId     String?
-  amcId         String?
-  warrantyId    String?
-  
-  subject       String
-  description   String    @db.Text
-  category      String?
-  priority      String    @default("MEDIUM") // LOW, MEDIUM, HIGH, CRITICAL
-  status        String    @default("OPEN")   // OPEN, IN_PROGRESS, PENDING_CUSTOMER, RESOLVED, CLOSED, CANCELLED
-  
+  id           String  @id @default(uuid())
+  ticketNumber String  @unique
+  businessId   String
+  customerId   String?
+  projectId    String?
+  amcId        String?
+  warrantyId   String?
+
+  subject     String
+  description String  @db.Text
+  category    String?
+  priority    String  @default("MEDIUM") // LOW, MEDIUM, HIGH, CRITICAL
+  status      String  @default("OPEN") // OPEN, IN_PROGRESS, PENDING_CUSTOMER, RESOLVED, CLOSED, CANCELLED
+
   assignedEngineerId String?
-  
+
   expectedResolution DateTime?
   resolvedAt         DateTime?
-  
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
 
-  business      Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  customer      Customer? @relation(fields: [customerId], references: [id])
-  project       Project?  @relation(fields: [projectId], references: [id])
-  amc           AMC?      @relation(fields: [amcId], references: [id])
-  warranty      Warranty? @relation(fields: [warrantyId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  business         Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  customer         Customer? @relation(fields: [customerId], references: [id])
+  project          Project?  @relation(fields: [projectId], references: [id])
+  amc              AMC?      @relation(fields: [amcId], references: [id])
+  warranty         Warranty? @relation(fields: [warrantyId], references: [id])
   assignedEngineer Employee? @relation("TicketEngineer", fields: [assignedEngineerId], references: [id])
-  
-  comments      TicketComment[]
-  attachments   TicketAttachment[]
+
+  comments    TicketComment[]
+  attachments TicketAttachment[]
 }
 
 model TicketComment {
-  id          String   @id @default(uuid())
-  ticketId    String
-  businessId  String
-  userId      String?
-  comment     String   @db.Text
-  isInternal  Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  
-  ticket      Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  user        User?    @relation(fields: [userId], references: [id])
+  id         String   @id @default(uuid())
+  ticketId   String
+  businessId String
+  userId     String?
+  comment    String   @db.Text
+  isInternal Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  ticket   Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user     User?    @relation(fields: [userId], references: [id])
 }
 
 model TicketAttachment {
-  id          String   @id @default(uuid())
-  ticketId    String
-  businessId  String
-  fileName    String
-  fileUrl     String
-  uploadedAt  DateTime @default(now())
+  id         String   @id @default(uuid())
+  ticketId   String
+  businessId String
+  fileName   String
+  fileUrl    String
+  uploadedAt DateTime @default(now())
 
-  ticket      Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  ticket   Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+}
+
+model ResourceAllocation {
+  id                String   @id @default(uuid())
+  businessId        String
+  projectId         String
+  taskId            String?
+  employeeId        String
+  department        String?
+  role              String?
+  startDate         DateTime?
+  endDate           DateTime?
+  estimatedHours    Float    @default(0)
+  allocationPercent Float    @default(100)
+  priority          String?
+  notes             String?  @db.Text
+  status            String   @default("Active")
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  project  Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  task     ProjectTask? @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  employee User     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 }

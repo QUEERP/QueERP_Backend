@@ -8,14 +8,14 @@ const businessSetupService = require("../services/BusinessSetupService");
 //////////////////////////////////////////////////////
 exports.createBusiness = async (req, res) => {
   try {
-    const { name, country } = req.body;
+    const { name, country, businessType } = req.body;
     const userId = req.user.userId;
 
     if (!name || !country) {
       return errorResponse(res, "Business Name and Country are required.", 400);
     }
 
-    const business = await businessSetupService.setupNewBusiness(name, country, userId);
+    const business = await businessSetupService.setupNewBusiness(name, country, businessType, userId);
 
     return successResponse(res, business, "Business created", 201);
   } catch (error) {
@@ -31,6 +31,36 @@ exports.createBusiness = async (req, res) => {
 exports.getMyData = async (req, res) => {
   try {
     const userId = req.user.userId;
+
+    //////////////////////////////////////////////////////
+    // SUPER ADMIN OVERRIDE
+    //////////////////////////////////////////////////////
+    if (userId === "subscription-admin" || req.user.role === "SUPER_ADMIN") {
+      const allBusinesses = await prisma.business.findMany({
+        include: {
+          settings: true,
+          customers: true,
+          invoices: {
+            include: { customer: true },
+            orderBy: { createdAt: "desc" },
+          },
+          users: {
+            include: {
+              user: { select: { id: true, name: true, email: true } },
+              role: { include: { rolePermissions: { include: { permission: true } } } },
+              userPermissions: { include: { permission: true } },
+            },
+          },
+        },
+      });
+
+      return res.status(200).json({
+        success: true,
+        user: { name: "Super Admin", role: "SUPER_ADMIN", isActive: true },
+        ownedBusinesses: allBusinesses,
+        memberBusinesses: [],
+      });
+    }
 
     //////////////////////////////////////////////////////
     // 1️⃣ LOGIN USER

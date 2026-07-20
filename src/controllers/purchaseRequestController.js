@@ -20,29 +20,27 @@ exports.createPurchaseRequest = async (req, res) => {
     // Generate requestNumber if not provided
     const finalRequestNumber = requestNumber || `PR-${Date.now()}`;
 
-    const purchaseRequest = await prisma.purchase_requests.create({
+    const purchaseRequest = await prisma.purchaseRequest.create({
       data: {
         id: prId,
         businessId,
         requestNumber: finalRequestNumber,
         department,
-        requesterId: req.user.userId,
+        requesterId: req.membership?.id || null,
         status,
         notes,
-        purchase_request_items: {
+        items: {
           create: items.map((item) => ({
             id: crypto.randomUUID(),
             productId: item.productId || undefined,
             description: item.description,
             quantity: Number(item.quantity) || 1,
             estimatedPrice: Number(item.estimatedPrice) || 0,
-            itemType: item.itemType || "GOODS",
-            hsnSacCode: item.hsnSacCode || null
           })).filter(i => i.productId || i.description), // Basic validation
         },
       },
       include: {
-        purchase_request_items: true,
+        items: true,
       },
     });
 
@@ -66,15 +64,15 @@ exports.getPurchaseRequests = async (req, res) => {
   try {
     const businessId = req.business.id;
 
-    const requests = await prisma.purchase_requests.findMany({
+    const requests = await prisma.purchaseRequest.findMany({
       where: { businessId },
       include: {
-        purchase_request_items: {
+        items: {
           include: {
-            Product: true
+            product: true
           }
         },
-        business_users: {
+        requester: {
           include: {
             user: true
           }
@@ -104,15 +102,15 @@ exports.getPurchaseRequestById = async (req, res) => {
     const { id } = req.params;
     const businessId = req.business.id;
 
-    const request = await prisma.purchase_requests.findFirst({
+    const request = await prisma.purchaseRequest.findFirst({
       where: { id, businessId },
       include: {
-        purchase_request_items: {
+        items: {
           include: {
-            Product: true
+            product: true
           }
         },
-        business_users: {
+        requester: {
           include: {
             user: true
           }
@@ -148,7 +146,7 @@ exports.updatePurchaseRequest = async (req, res) => {
     const businessId = req.business.id;
     const { items, ...updateData } = req.body;
 
-    const existing = await prisma.purchase_requests.findFirst({
+    const existing = await prisma.purchaseRequest.findFirst({
       where: { id, businessId },
     });
 
@@ -159,7 +157,7 @@ exports.updatePurchaseRequest = async (req, res) => {
       });
     }
 
-    const updated = await prisma.purchase_requests.update({
+    const updated = await prisma.purchaseRequest.update({
       where: { id },
       data: {
         ...updateData,

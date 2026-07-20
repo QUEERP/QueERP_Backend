@@ -192,7 +192,7 @@ class ErpController {
       const { productId, warehouseId, type, page = 1, limit = 20 } = req.query;
 
       const offset = (Number(page) - 1) * Number(limit);
-      const whereClause = { businessId };
+      const whereClause = { businessId, product: { type: "GOODS" } };
 
       if (productId) whereClause.productId = productId;
       if (warehouseId) whereClause.warehouseId = warehouseId;
@@ -240,7 +240,7 @@ class ErpController {
       const { warehouseId, productId } = req.query;
 
       const whereClause = {
-        product: { businessId }
+        product: { businessId, type: "GOODS" }
       };
 
       if (warehouseId) whereClause.warehouseId = warehouseId;

@@ -34,7 +34,8 @@ exports.getStock = async (req, res) => {
   try {
     const stock = await prisma.stock.findMany({
       where: {
-        warehouse: { businessId: req.business.id }
+        warehouse: { businessId: req.business.id },
+        product: { type: 'GOODS' }
       },
       include: { 
         product: {
@@ -64,7 +65,7 @@ exports.getStock = async (req, res) => {
 exports.getMovements = async (req, res) => {
   try {
     const movements = await prisma.stockMovement.findMany({
-      where: { businessId: req.business.id },
+      where: { businessId: req.business.id, product: { type: 'GOODS' } },
       include: { product: true, warehouse: true },
       orderBy: { createdAt: 'desc' }
     });

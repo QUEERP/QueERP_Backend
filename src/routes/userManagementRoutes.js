@@ -1,6 +1,7 @@
 const express = require("express");
 const {
   getBusinessUsers,
+  createUser,
   inviteUser,
   toggleUserStatus,
   assignDirectPermission,
@@ -18,6 +19,8 @@ router.use(businessMiddleware);
 
 router.get("/", checkPermission("user", "read"), getBusinessUsers);
 
+
+router.post("/", checkPermission("user", "create"), createUser);
 
 router.post("/invite", checkPermission("user", "create"), inviteUser);
 

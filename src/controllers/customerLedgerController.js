@@ -244,29 +244,15 @@ exports.getCustomerStatementPdf = async (req, res) => {
     //////////////////////////////////////////////////////
     // UPLOAD TO CLOUDINARY
     //////////////////////////////////////////////////////
-    const upload = await new Promise((resolve, reject) => {
-
-      const stream = cloudinary.uploader.upload_stream(
-        {
-          resource_type: "raw",
-          public_id: `statements/customer-${customerId}-${Date.now()}`,
-          format: "pdf"
-        },
-        (err, result) => {
-          if (err) return reject(err);
-          resolve(result);
-        }
-      );
-
-      stream.end(pdfBuffer);
-    });
+    const pdfWorkflow = require("../utils/pdfWorkflow");
+    const secureUrl = await pdfWorkflow(pdfBuffer, `customer-${customerId}-${Date.now()}`, "statements");
 
     //////////////////////////////////////////////////////
     // RESPONSE
     //////////////////////////////////////////////////////
     res.json({
       success: true,
-      pdfUrl: upload.secure_url
+      pdfUrl: secureUrl
     });
 
   } catch (error) {

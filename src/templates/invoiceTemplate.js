@@ -1,6 +1,15 @@
 module.exports = (invoice, settings = {}) => {
-  const template = invoice.designTemplate || "modern";
+  const template = settings.invoiceTemplate || invoice.designTemplate || "modern";
   
+  const getSymbol = (curr) => {
+    if (curr === 'INR') return '₹';
+    if (curr === 'USD') return '$';
+    if (curr === 'EUR') return '€';
+    if (curr === 'GBP') return '£';
+    return curr;
+  };
+  const sym = getSymbol(invoice.currency) || invoice.currency || '$';
+
   // Helper to format currency
   const fmt = (val) => (val || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   
@@ -34,7 +43,7 @@ module.exports = (invoice, settings = {}) => {
 
     itemizedTaxes.push({
       index: idx + 1,
-      description: item.description,
+      description: item.itemName ? item.itemName + (item.description ? ' - ' + item.description : '') : item.description,
       taxes: itemTaxes
     });
   });
@@ -124,7 +133,7 @@ module.exports = (invoice, settings = {}) => {
   <div class="content-padding">
     <div class="yellow-header" style="display:grid; grid-template-columns: 1fr 1.2fr 1fr; align-items:start;">
        <div style="text-align: left;">
-         ${settings.companyLogo ? `<img src="${settings.companyLogo}" style="max-height:80px;" />` : `<div style="font-size:32px; font-weight:bold; color:#f2c94c;">${settings.companyName || 'LOGO'}</div>`}
+         ${settings.companyLogo ? `<img src="${settings.companyLogo}" style="max-height:80px; max-width:100%; object-fit:contain; object-position:left;" />` : `<div style="font-size:32px; font-weight:bold; color:#f2c94c;">${settings.companyName || 'LOGO'}</div>`}
        </div>
        <div style="text-align: center;">
          <div style="font-size:16px; font-weight:bold;">${settings.companyName || ''}</div>
@@ -173,7 +182,7 @@ module.exports = (invoice, settings = {}) => {
         ${(invoice.items || []).map((i, idx) => `
         <tr>
           <td style="text-align:center; font-weight:bold;">${idx + 1}</td>
-          <td>${i.description}</td>
+          <td>${i.itemName ? '<b>' + i.itemName + '</b><br/>' : ''}${i.description}</td>
           <td style="text-align:center;">${i.quantity || i.hours || 0}</td>
           <td style="text-align:right;">${fmt(i.rate)}</td>
           <td style="text-align:right;">${fmt(i.totalAmount)}</td>
@@ -217,7 +226,7 @@ module.exports = (invoice, settings = {}) => {
        <div style="text-align: right;">
          <div style="margin-bottom: 20px;">Date : ${new Date(invoice.invoiceDate).toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'})}</div>
          <div style="display: inline-block; text-align: center;">
-           ${settings.signatureUrl ? `<img src="${settings.signatureUrl}" style="max-height:50px; margin-bottom:5px;"/>` : '<div style="height:55px;"></div>'}
+           ${settings.signatureUrl ? `<img src="${settings.signatureUrl}" style="max-height:50px; max-width:150px; object-fit:contain; object-position:center; margin-bottom:5px;"/>` : '<div style="height:55px;"></div>'}
            <div style="border-top:1px solid #111; width:150px; padding-top:5px;">${settings.companyName || 'Authorized Signature'}</div>
          </div>
        </div>
@@ -281,7 +290,7 @@ module.exports = (invoice, settings = {}) => {
 <body>
   <div class="orange-header-bg">
     <div style="text-align: left;">
-      ${settings.companyLogo ? `<img src="${settings.companyLogo}" style="max-height:80px; filter: brightness(0) invert(1);" />` : `<div style="font-size:32px; font-weight:bold;">${settings.companyName || 'LOGO'}</div>`}
+      ${settings.companyLogo ? `<img src="${settings.companyLogo}" style="max-height:80px; max-width:100%; object-fit:contain; object-position:left; filter: brightness(0) invert(1);" />` : `<div style="font-size:32px; font-weight:bold;">${settings.companyName || 'LOGO'}</div>`}
     </div>
     <div style="text-align: center;">
       <div style="font-size:16px; font-weight:bold;">${settings.companyName || ''}</div>
@@ -321,7 +330,7 @@ module.exports = (invoice, settings = {}) => {
       <tbody>
         ${(invoice.items || []).map((i) => `
         <tr>
-          <td style="font-weight:bold; color:#333;">${i.description}</td>
+            <td style="font-weight:bold; color:#333;">${i.itemName ? i.itemName + ' - ' : ''}${i.description}</td>
           <td style="text-align:center;">${fmt(i.rate)}</td>
           <td style="text-align:center;">${i.quantity || i.hours || 0}</td>
           <td style="text-align:right;">${fmt(i.totalAmount)}</td>
@@ -378,7 +387,7 @@ module.exports = (invoice, settings = {}) => {
         <div style="text-align: right; margin-top: 40px; padding-right: 20px;">
           <div style="display: inline-block; text-align: center;">
             <div style="font-weight: bold; font-size: 12px; margin-bottom: 5px;">${settings.companyName || 'Signature'}</div>
-            ${settings.signatureUrl ? `<img src="${settings.signatureUrl}" style="max-height:40px; margin-bottom:5px;"/>` : '<div style="height:45px;"></div>'}
+            ${settings.signatureUrl ? `<img src="${settings.signatureUrl}" style="max-height:40px; max-width:150px; object-fit:contain; object-position:center; margin-bottom:5px;"/>` : '<div style="height:45px;"></div>'}
             <div style="border-top:1px solid #111; width:150px; padding-top:5px; font-weight: bold; font-size: 10px; text-transform: uppercase;">SIGNATURE</div>
           </div>
         </div>
@@ -435,7 +444,7 @@ module.exports = (invoice, settings = {}) => {
   
   .spacer { flex: 1; min-height: 20px; }
   .signature-box { text-align: right; margin-top: 30px; }
-  .signature-box img { max-width: 150px; max-height: 70px; margin-bottom: 5px; }
+  .signature-box img { max-width: 150px; max-height: 70px; margin-bottom: 5px; object-fit: contain; object-position: center; }
   .signature-line { border-top: 2.5px solid #000; display: inline-block; width: 220px; padding-top: 8px; text-align: center; }
 </style>
 </head>
@@ -444,7 +453,7 @@ module.exports = (invoice, settings = {}) => {
   <div class="content-padding">
     <div class="invoice-header">
       <div>
-        ${settings.companyLogo ? `<img src="${settings.companyLogo}" style="max-height:80px;" />` : ''}
+        ${settings.companyLogo ? `<img src="${settings.companyLogo}" style="max-height:80px; max-width:100%; object-fit:contain; object-position:left;" />` : ''}
       </div>
       <div class="text-center">
         <div class="bold" style="font-size:16px;">${settings.companyName || ''}</div>
@@ -510,7 +519,10 @@ module.exports = (invoice, settings = {}) => {
         ${(invoice.items || []).map((i, idx) => `
         <tr>
           <td class="text-center">${idx + 1}</td>
-          <td>${i.description}</td>
+          <td>
+            <div style="font-weight:600; color:#111;">${i.itemName || ''}</div>
+            <div style="${i.itemName ? 'color:#555; margin-top:2px; font-size:9px;' : ''}">${i.description}</div>
+          </td>
           <td class="text-center">${i.hsnSacCode || '-'}</td>
           <td class="text-center">${i.quantity || i.hours || 0}</td>
           <td class="text-center">${fmt(i.rate)}</td>
@@ -547,7 +559,7 @@ module.exports = (invoice, settings = {}) => {
         <div class="spacer" style="height:40px;"></div>
         
         <div class="signature-box">
-          ${settings.signatureUrl ? `<img src="${settings.signatureUrl}" />` : '<div style="height:60px;"></div>'}
+          ${settings.signatureUrl ? `<img src="${settings.signatureUrl}" style="max-height:70px; max-width:150px; object-fit:contain; object-position:center;" />` : '<div style="height:60px;"></div>'}
           <div class="signature-line">
             <div class="bold">Authorized Signature</div>
           </div>

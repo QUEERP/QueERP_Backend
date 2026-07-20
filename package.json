@@ -40,6 +40,7 @@
     "puppeteer": "^22.15.0",
     "puppeteer-core": "^22.15.0",
     "streamifier": "^0.1.1",
+    "world-countries": "^5.1.0",
     "ws": "^8.21.0",
     "xlsx": "^0.18.5",
     "zod": "^4.4.3"

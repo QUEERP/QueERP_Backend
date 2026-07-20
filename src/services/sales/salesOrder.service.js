@@ -10,9 +10,15 @@ const reserveStock = async (tx, businessId, items) => {
   for (const item of items) {
     if (!item.productId) continue;
 
+    const product = await tx.product.findUnique({
+      where: { id: item.productId },
+      select: { type: true, name: true }
+    });
+
+    if (product?.type === 'SERVICE') continue;
+
     if (!item.warehouseId) {
-      // Skip stock reservation for items without a warehouse (e.g. service items)
-      continue;
+      throw new Error(`Warehouse is required for goods item: ${product.name}`);
     }
 
     const stockRecord = await tx.stock.findFirst({
@@ -48,6 +54,13 @@ const releaseStock = async (tx, businessId, items) => {
   for (const item of items) {
     if (!item.productId || !item.warehouseId) continue;
 
+    const product = await tx.product.findUnique({
+      where: { id: item.productId },
+      select: { type: true }
+    });
+
+    if (product?.type === 'SERVICE') continue;
+
     await releaseReservedStock(tx, {
       businessId,
       productId: item.productId,
@@ -64,7 +77,7 @@ const createSalesOrder = async (businessId, userId, userEmail, data) => {
     const orderNumber = await generateDocNumber(tx, businessId, "SO", "salesOrder", "orderNumber");
 
     // 2. Compute pricing
-    const pricing = calculatePricing(data.items);
+    const pricing = calculatePricing(data.items, Number(data.discount || 0), Number(data.tax || 0));
 
     // 3. Create Sales Order
     const salesOrder = await tx.salesOrder.create({
@@ -87,7 +100,13 @@ const createSalesOrder = async (businessId, userId, userEmail, data) => {
         deliveryDate: data.deliveryDate ? new Date(data.deliveryDate) : null,
         notes: data.notes || null,
         items: {
-          create: pricing.processedItems
+          create: pricing.processedItems.map(item => {
+            const { warehouseId, productId, itemName, ...rest } = item;
+            const payload = { ...rest };
+            if (productId) payload.product = { connect: { id: productId } };
+            if (warehouseId) payload.warehouse = { connect: { id: warehouseId } };
+            return payload;
+          })
         }
       },
       include: {
@@ -238,7 +257,7 @@ const updateSalesOrder = async (businessId, userId, userEmail, orderId, data) =>
       await releaseStock(tx, businessId, existing.items);
 
       // 2. Calculate new pricing
-      pricing = calculatePricing(data.items);
+      pricing = calculatePricing(data.items, Number(data.discount || 0), Number(data.tax || 0));
 
       // 3. Delete old items
       await tx.salesOrderItem.deleteMany({
@@ -267,7 +286,13 @@ const updateSalesOrder = async (businessId, userId, userEmail, orderId, data) =>
         deliveryDate: data.deliveryDate !== undefined ? (data.deliveryDate ? new Date(data.deliveryDate) : null) : existing.deliveryDate,
         notes: data.notes !== undefined ? data.notes : existing.notes,
         items: data.items ? {
-          create: pricing.processedItems
+          create: pricing.processedItems.map(item => {
+            const { warehouseId, productId, itemName, ...rest } = item;
+            const payload = { ...rest };
+            if (productId) payload.product = { connect: { id: productId } };
+            if (warehouseId) payload.warehouse = { connect: { id: warehouseId } };
+            return payload;
+          })
         } : undefined
       },
       include: {

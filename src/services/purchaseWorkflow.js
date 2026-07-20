@@ -32,21 +32,23 @@ class PurchaseWorkflow {
            projectCostIncrement += (Number(item.receivedQty) * (poItem.price || 0));
         }
 
-        // Call the service to increase physical counts and register StockMovement
-        await InventoryService.increaseStock({
-          businessId,
-          productId: item.productId,
-          warehouseId: item.warehouseId,
-          quantity: Number(item.receivedQty),
-          type: "PURCHASE_IN",
-          reference: {
-            purchaseOrderId: po.id,
-            referenceNo: grnNumber
-          },
-          performedBy,
-          note: note || `Goods Receipt against PO ${po.poNumber}`,
-          tx
-        });
+        // Call the service to increase physical counts and register StockMovement only for GOODS
+        if (item.warehouseId) {
+          await InventoryService.increaseStock({
+            businessId,
+            productId: item.productId,
+            warehouseId: item.warehouseId,
+            quantity: Number(item.receivedQty),
+            type: "PURCHASE_IN",
+            reference: {
+              purchaseOrderId: po.id,
+              referenceNo: grnNumber
+            },
+            performedBy,
+            note: note || `Goods Receipt against PO ${po.poNumber}`,
+            tx
+          });
+        }
       }
 
       if (po.projectId && projectCostIncrement > 0) {

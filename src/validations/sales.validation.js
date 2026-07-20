@@ -2,13 +2,17 @@ const { z } = require("zod");
 
 // Item validation helper schema
 const lineItemSchema = z.object({
-  productId: z.string().uuid().optional().nullable(),
-  description: z.string().min(1, "Item description is required"),
+  productId: z.union([z.string().uuid(), z.literal(""), z.null()]).optional().transform(v => v === "" ? null : v),
+  itemName: z.string().optional().nullable(),
+  description: z.string().optional().nullable(),
   itemType: z.enum(["GOODS", "SERVICE"]).default("GOODS"),
   hsnSacCode: z.string().optional().nullable(),
   quantity: z.number().optional().default(0),
   price: z.number().nonnegative("Price cannot be negative").optional().default(0),
   taxPercent: z.number().nonnegative("Tax percent cannot be negative").default(0),
+  cgstPercent: z.number().nonnegative().optional().default(0),
+  sgstPercent: z.number().nonnegative().optional().default(0),
+  igstPercent: z.number().nonnegative().optional().default(0),
   taxDetails: z.array(
     z.object({
       name: z.string(),
@@ -31,6 +35,8 @@ const createQuotationSchema = z.object({
   issueDate: z.string().datetime().optional().or(z.coerce.date()).default(() => new Date()),
   expiryDate: z.string().datetime().optional().or(z.coerce.date()).nullable(),
   notes: z.string().optional().nullable(),
+  taxType: z.string().optional().nullable(),
+  gstTreatment: z.string().optional().nullable(),
   items: z.array(lineItemSchema).min(1, "At least one line item is required")
 });
 
@@ -46,6 +52,8 @@ const updateQuotationSchema = z.object({
   issueDate: z.coerce.date().optional(),
   expiryDate: z.coerce.date().nullable().optional(),
   notes: z.string().optional().nullable(),
+  taxType: z.string().optional().nullable(),
+  gstTreatment: z.string().optional().nullable(),
   items: z.array(lineItemSchema).min(1).optional()
 });
 
@@ -96,6 +104,18 @@ const createInvoiceSchema = z.object({
   adminNote: z.string().optional().nullable(),
   designTemplate: z.string().default("modern"),
   projectId: z.string().uuid("Invalid project ID").optional().nullable(),
+  cgst: z.number().optional().nullable(),
+  sgst: z.number().optional().nullable(),
+  igst: z.number().optional().nullable(),
+  tds: z.number().optional().nullable(),
+  vatAmount: z.number().optional().nullable(),
+  vatPercentage: z.number().optional().nullable(),
+  vatType: z.string().optional().nullable(),
+  emirate: z.string().optional().nullable(),
+  ewayBillNo: z.string().optional().nullable(),
+  transportDetails: z.string().optional().nullable(),
+  reverseCharge: z.boolean().optional().nullable(),
+  shippingCharges: z.number().optional().nullable(),
   items: z.array(
     lineItemSchema.extend({
       hours: z.number().optional().default(0), // support existing hours logic
@@ -121,6 +141,20 @@ const updateInvoiceSchema = z.object({
   currency: z.string().length(3).optional(),
   terms: z.string().optional().nullable(),
   adminNote: z.string().optional().nullable(),
+  designTemplate: z.string().optional().nullable(),
+  projectId: z.string().uuid("Invalid project ID").optional().nullable(),
+  cgst: z.number().optional().nullable(),
+  sgst: z.number().optional().nullable(),
+  igst: z.number().optional().nullable(),
+  tds: z.number().optional().nullable(),
+  vatAmount: z.number().optional().nullable(),
+  vatPercentage: z.number().optional().nullable(),
+  vatType: z.string().optional().nullable(),
+  emirate: z.string().optional().nullable(),
+  ewayBillNo: z.string().optional().nullable(),
+  transportDetails: z.string().optional().nullable(),
+  reverseCharge: z.boolean().optional().nullable(),
+  shippingCharges: z.number().optional().nullable(),
   items: z.array(lineItemSchema).min(1).optional()
 });
 

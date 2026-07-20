@@ -64,6 +64,13 @@ router.post("/global/tickets", TicketController.createTicket);
 router.put("/global/tickets/:id", TicketController.updateTicket);
 router.delete("/global/tickets/:id", TicketController.deleteTicket);
 
+// Planning / Schedules
+router.post("/global/plannings", Controller.createPlanning);
+router.get("/global/plannings", Controller.getPlannings);
+router.get("/global/plannings/:id", Controller.getPlanningById);
+router.put("/global/plannings/:id", Controller.updatePlanning);
+router.delete("/global/plannings/:id", Controller.deletePlanning);
+
 // Exports
 router.get("/change-requests/export/excel", ExportController.exportChangeRequestsExcel);
 router.get("/change-requests/export/pdf", ExportController.exportChangeRequestsPDF);
@@ -81,6 +88,10 @@ router.post("/", Controller.createProject);
 router.get("/", Controller.getProjects);
 router.get("/:id", Controller.getProjectDetails);
 router.put("/:id", Controller.updateProject);
+
+// Global Tasks & Milestones
+router.get("/global/tasks", Controller.getGlobalTasks);
+router.get("/global/milestones", Controller.getGlobalMilestones);
 
 // Milestones
 router.post("/:projectId/milestones", Controller.createMilestone);

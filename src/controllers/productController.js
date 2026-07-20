@@ -198,14 +198,21 @@ exports.createProduct = async (req, res) => {
       taxCode,
       unit = "pcs",
       taxPercent = 0,
-      initialQty = 0,
+      initialQty,
       warehouseId
     } = req.body;
 
-    if (!name || !sku || !price || !type) {
+    if (!name || !sku || price === undefined || price === null || !type) {
       return res.status(400).json({
         success: false,
-        message: "name, sku, price and type are required",
+        message: "name, sku, price, and type are required",
+      });
+    }
+
+    if (type === "GOODS" && (initialQty === undefined || initialQty === null)) {
+      return res.status(400).json({
+        success: false,
+        message: "initialQty is required for GOODS",
       });
     }
 
@@ -220,8 +227,8 @@ exports.createProduct = async (req, res) => {
       hsnCode: taxCode,
       taxPercent: Number(taxPercent),
       unit,
-      initialQty: Number(initialQty),
-      warehouseId,
+      initialQty: type === "SERVICE" ? 0 : Number(initialQty),
+      warehouseId: type === "SERVICE" ? null : warehouseId,
       performedBy: req.user.userId
     });
 
@@ -349,7 +356,7 @@ exports.updateProduct = async (req, res) => {
       "name", "description", "sku", "price", "costPrice", "taxPercent",
       "unit", "isActive", "taxCode", "type", "attachments", "barcode",
       "brandId", "categoryId", "image", "isBatchTracking", "isSerialTracking",
-      "minimumStock", "openingStock", "reorderLevel", "unitId"
+      "minimumStock", "reorderLevel", "unitId"
     ];
 
     const updateData = {};
@@ -360,6 +367,11 @@ exports.updateProduct = async (req, res) => {
     if (req.body.sellingPrice !== undefined) updateData.price = req.body.sellingPrice;
     if (req.body.taxRate !== undefined) updateData.taxPercent = req.body.taxRate;
     if (req.body.hsnCode !== undefined) updateData.taxCode = req.body.hsnCode;
+
+    if (updateData.type === "SERVICE" || (!updateData.type && type === "SERVICE")) {
+      updateData.reorderLevel = 0;
+      updateData.minimumStock = 0;
+    }
 
     const updated = await prisma.product.updateMany({
       where: { id, businessId: req.business.id },

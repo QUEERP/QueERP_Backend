@@ -22,7 +22,7 @@ const calculateNextDate = (currentDate, frequency) => {
 
 const createRecurringInvoice = async (businessId, userId, userEmail, data) => {
   return await prisma.$transaction(async (tx) => {
-    const pricing = calculatePricing(data.items);
+    const pricing = calculatePricing(data.items, Number(data.discount || 0), Number(data.tax || 0));
 
     const processedItems = pricing.processedItems.map((item) => ({
       productId: item.productId,

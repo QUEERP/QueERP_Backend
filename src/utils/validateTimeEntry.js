@@ -10,7 +10,7 @@ exports.validateTimeEntry = async (data) => {
   if (!project) throw new Error("Invalid project");
 
   if (taskId) {
-    const task = await prisma.task.findFirst({
+    const task = await prisma.projectTask.findFirst({
       where: { id: taskId, projectId },
     });
 

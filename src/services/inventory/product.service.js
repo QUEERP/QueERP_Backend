@@ -465,6 +465,8 @@ const updateProduct = async (businessId, userId, userEmail, id, data) => {
       }
     }
 
+    const finalType = data.type !== undefined ? data.type : product.type;
+
     const updated = await tx.product.update({
       where: { id },
       data: {
@@ -474,7 +476,7 @@ const updateProduct = async (businessId, userId, userEmail, id, data) => {
         barcode: data.barcode !== undefined ? data.barcode : product.barcode,
         price: data.price !== undefined ? parseFloat(data.price) : product.price,
         costPrice: data.costPrice !== undefined ? parseFloat(data.costPrice) : product.costPrice,
-        type: data.type !== undefined ? data.type : product.type,
+        type: finalType,
         taxCode: data.taxCode !== undefined ? data.taxCode : product.taxCode,
         taxPercent: data.taxPercent !== undefined ? parseFloat(data.taxPercent) : product.taxPercent,
         unit: data.unit !== undefined ? data.unit : product.unit,
@@ -482,8 +484,8 @@ const updateProduct = async (businessId, userId, userEmail, id, data) => {
         categoryId: data.categoryId !== undefined ? data.categoryId : product.categoryId,
         brandId: data.brandId !== undefined ? data.brandId : product.brandId,
         unitId: data.unitId !== undefined ? data.unitId : product.unitId,
-        reorderLevel: data.reorderLevel !== undefined ? parseFloat(data.reorderLevel) : product.reorderLevel,
-        minimumStock: data.minimumStock !== undefined ? parseFloat(data.minimumStock) : product.minimumStock,
+        reorderLevel: finalType === 'SERVICE' ? 0 : (data.reorderLevel !== undefined ? parseFloat(data.reorderLevel) : product.reorderLevel),
+        minimumStock: finalType === 'SERVICE' ? 0 : (data.minimumStock !== undefined ? parseFloat(data.minimumStock) : product.minimumStock),
         isBatchTracking: data.isBatchTracking !== undefined ? data.isBatchTracking : product.isBatchTracking,
         isSerialTracking: data.isSerialTracking !== undefined ? data.isSerialTracking : product.isSerialTracking,
         image: data.image !== undefined ? data.image : product.image,

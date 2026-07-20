@@ -5,24 +5,42 @@ const { logAction, triggerNotification } = require("./audit.service");
  * Robust document number generator preventing duplicates and collision on deletion.
  */
 const generateDocNumber = async (tx, businessId, prefix, modelName, fieldName) => {
+  let nextNum = 1;
   const lastRecord = await tx[modelName].findFirst({
     where: { businessId },
     orderBy: { createdAt: "desc" },
     select: { [fieldName]: true }
   });
-  if (!lastRecord || !lastRecord[fieldName]) {
-    return `${prefix}-001`;
+  
+  if (lastRecord && lastRecord[fieldName]) {
+    const parts = lastRecord[fieldName].split("-");
+    const numStr = parts[parts.length - 1];
+    nextNum = isNaN(parseInt(numStr, 10)) ? 1 : parseInt(numStr, 10) + 1;
   }
-  const parts = lastRecord[fieldName].split("-");
-  const numStr = parts[parts.length - 1];
-  const nextNum = isNaN(parseInt(numStr, 10)) ? 1 : parseInt(numStr, 10) + 1;
-  return `${prefix}-${String(nextNum).padStart(3, "0")}`;
+
+  let docNumber = "";
+  let isUnique = false;
+
+  while (!isUnique) {
+    docNumber = `${prefix}-${String(nextNum).padStart(3, "0")}`;
+    const existing = await tx[modelName].findFirst({
+      where: { businessId, [fieldName]: docNumber }
+    });
+    
+    if (!existing) {
+      isUnique = true;
+    } else {
+      nextNum++;
+    }
+  }
+
+  return docNumber;
 };
 
 /**
  * Calculates item totals and aggregates.
  */
-const calculatePricing = (items) => {
+const calculatePricing = (items, globalDiscount = 0, globalTaxRate = 0) => {
   let subtotal = 0;
   let totalTax = 0;
   let totalDiscount = 0;
@@ -46,7 +64,8 @@ const calculatePricing = (items) => {
     return {
       productId: item.productId || null,
       warehouseId: item.warehouseId || null,
-      description: item.description,
+      itemName: item.itemName || null,
+      description: item.description || "",
       itemType: item.itemType || "GOODS",
       hsnSacCode: item.hsnSacCode || null,
       quantity: qty,
@@ -61,77 +80,98 @@ const calculatePricing = (items) => {
     };
   });
 
-  const totalAmount = subtotal + totalTax - totalDiscount;
+  const globalTaxAmount = Math.max(subtotal - totalDiscount - globalDiscount, 0) * (globalTaxRate / 100);
+  const totalAmount = subtotal + totalTax + globalTaxAmount - totalDiscount - globalDiscount;
 
   return {
     subtotal,
-    tax: totalTax,
-    discount: totalDiscount,
+    tax: totalTax + globalTaxAmount,
+    discount: totalDiscount + globalDiscount,
     totalAmount,
     processedItems
   };
 };
 
 const createQuotation = async (businessId, userId, userEmail, data) => {
-  return await prisma.$transaction(async (tx) => {
-    // 1. Generate unique quote number
-    const quoteNumber = await generateDocNumber(tx, businessId, "QT", "quotation", "quoteNumber");
+  const MAX_RETRIES = 3;
+  let attempts = 0;
 
-    // 2. Compute pricing
-    const pricing = calculatePricing(data.items);
+  while (attempts < MAX_RETRIES) {
+    try {
+      return await prisma.$transaction(async (tx) => {
+        // 1. Generate unique quote number
+        const quoteNumber = await generateDocNumber(tx, businessId, "QT", "quotation", "quoteNumber");
 
-    // 3. Create Quotation and Items
-    const quotation = await tx.quotation.create({
-      data: {
-        businessId,
-        quoteNumber,
-        title: data.title || null,
-        customerId: data.customerId,
-        contactId: data.contactId || null,
-        dealId: data.dealId || null,
-        assignedToId: data.assignedToId || null,
-        status: "DRAFT",
-        subtotal: pricing.subtotal,
-        tax: pricing.tax,
-        discount: pricing.discount,
-        totalAmount: pricing.totalAmount,
-        currency: data.currency || "INR",
-        termsConditions: data.termsConditions || null,
-        issueDate: data.issueDate ? new Date(data.issueDate) : new Date(),
-        expiryDate: data.expiryDate ? new Date(data.expiryDate) : null,
-        notes: data.notes || null,
-        items: {
-          create: pricing.processedItems
-        }
-      },
-      include: {
-        items: true,
-        customer: true
+        // 2. Compute new pricing (including global discount and tax)
+        const pricing = calculatePricing(data.items, Number(data.discount || 0), Number(data.tax || 0));
+
+        // 3. Create Quotation and Items
+        const quotation = await tx.quotation.create({
+          data: {
+            businessId,
+            quoteNumber,
+            title: data.title || null,
+            customerId: data.customerId,
+            contactId: data.contactId || null,
+            dealId: data.dealId || null,
+            assignedToId: data.assignedToId || null,
+            status: "DRAFT",
+            subtotal: pricing.subtotal,
+            tax: pricing.tax,
+            discount: pricing.discount,
+            totalAmount: pricing.totalAmount,
+            currency: data.currency || "INR",
+            vatType: data.taxType || data.vatType || null,
+            termsConditions: data.termsConditions || null,
+            issueDate: data.issueDate ? new Date(data.issueDate) : new Date(),
+            expiryDate: data.expiryDate ? new Date(data.expiryDate) : null,
+            notes: data.notes || null,
+            items: {
+              create: pricing.processedItems.map(item => {
+                const { warehouseId, productId, ...rest } = item;
+                const payload = { ...rest };
+                if (productId) payload.product = { connect: { id: productId } };
+                return payload;
+              })
+            }
+          },
+          include: {
+            items: true,
+            customer: true
+          }
+        });
+
+        // 4. Log Action & Notification
+        await logAction(tx, {
+          businessId,
+          userId,
+          userEmail,
+          action: "QUOTATION_CREATED",
+          entityType: "Quotation",
+          entityId: quotation.id,
+          details: { quoteNumber, totalAmount: pricing.totalAmount }
+        });
+
+        await triggerNotification(tx, {
+          businessId,
+          title: "New Quotation Created",
+          message: `Quotation ${quoteNumber} of amount ${pricing.totalAmount} ${quotation.currency} has been drafted.`,
+          type: "SUCCESS",
+          entityType: "Quotation",
+          entityId: quotation.id
+        });
+
+        return quotation;
+      });
+    } catch (error) {
+      if (error.code === 'P2002') {
+        attempts++;
+        if (attempts >= MAX_RETRIES) throw new Error("Could not generate a unique quotation number. Please try again.");
+        continue;
       }
-    });
-
-    // 4. Log Action & Notification
-    await logAction(tx, {
-      businessId,
-      userId,
-      userEmail,
-      action: "QUOTATION_CREATED",
-      entityType: "Quotation",
-      entityId: quotation.id,
-      details: { quoteNumber, totalAmount: pricing.totalAmount }
-    });
-
-    await triggerNotification(tx, {
-      businessId,
-      title: "New Quotation Created",
-      message: `Quotation ${quoteNumber} of amount ${pricing.totalAmount} ${quotation.currency} has been drafted.`,
-      type: "SUCCESS",
-      entityType: "Quotation",
-      entityId: quotation.id
-    });
-
-    return quotation;
-  });
+      throw error;
+    }
+  }
 };
 
 const updateQuotation = async (businessId, userId, userEmail, quotationId, data) => {
@@ -151,7 +191,7 @@ const updateQuotation = async (businessId, userId, userEmail, quotationId, data)
     let pricing = {};
     if (data.items) {
       // Re-calculate pricing if items are provided
-      pricing = calculatePricing(data.items);
+      pricing = calculatePricing(data.items, Number(data.discount || 0), Number(data.tax || 0));
       // Delete old items
       await tx.quotationItem.deleteMany({
         where: { quotationId }
@@ -172,12 +212,18 @@ const updateQuotation = async (businessId, userId, userEmail, quotationId, data)
         discount: pricing.discount !== undefined ? pricing.discount : existing.discount,
         totalAmount: pricing.totalAmount !== undefined ? pricing.totalAmount : existing.totalAmount,
         currency: data.currency || existing.currency,
+        vatType: data.taxType !== undefined ? data.taxType : (data.vatType !== undefined ? data.vatType : existing.vatType),
         termsConditions: data.termsConditions !== undefined ? data.termsConditions : existing.termsConditions,
         issueDate: data.issueDate ? new Date(data.issueDate) : existing.issueDate,
         expiryDate: data.expiryDate !== undefined ? (data.expiryDate ? new Date(data.expiryDate) : null) : existing.expiryDate,
         notes: data.notes !== undefined ? data.notes : existing.notes,
         items: data.items ? {
-          create: pricing.processedItems
+          create: pricing.processedItems.map(item => {
+            const { warehouseId, productId, ...rest } = item;
+            const payload = { ...rest };
+            if (productId) payload.product = { connect: { id: productId } };
+            return payload;
+          })
         } : undefined
       },
       include: {
