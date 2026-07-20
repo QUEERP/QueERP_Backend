@@ -620,25 +620,31 @@ exports.downloadInvoicePdf = async (req, res) => {
 
     const invoice = await prisma.invoice.findFirst({ where: { id, businessId } });
 
-    if (!invoice?.pdfUrl) {
-      return res.status(404).json({ success: false, message: "PDF not found" });
+    if (!invoice) {
+      return res.status(404).json({ success: false, message: "Invoice not found" });
     }
 
-    const https = require('https');
+    // Since Cloudinary blocks PDF delivery on free tier, generate it dynamically
+    const generateInvoicePdfHelper = require("../utils/generateInvoicePdf");
     
-    https.get(invoice.pdfUrl, (pdfRes) => {
-      if (pdfRes.statusCode !== 200) {
-        return res.status(pdfRes.statusCode).json({ success: false, message: "Failed to fetch PDF from storage" });
-      }
-
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="Invoice_${invoice.invoiceNumber || id}.pdf"`);
-      
-      pdfRes.pipe(res);
-    }).on('error', (err) => {
-      console.error("downloadInvoicePdf proxy error:", err);
-      res.status(500).json({ success: false, message: "Failed to download PDF" });
+    // We already found the invoice, but let's make sure we have items and customer
+    const fullInvoice = await prisma.invoice.findFirst({
+      where: { id: invoice.id },
+      include: { customer: true, items: true }
     });
+
+    const settings = await prisma.settings.findUnique({
+      where: { businessId: req.business.id }
+    });
+    
+    const pdfSettings = settings || { companyName: "Your Company", signatureUrl: null };
+    const pdfBuffer = await generateInvoicePdfHelper(fullInvoice, pdfSettings);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Invoice_${invoice.invoiceNumber || id}.pdf"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    
+    return res.end(pdfBuffer);
   } catch (err) {
     console.error("downloadInvoicePdf controller error:", err);
     if (!res.headersSent) {

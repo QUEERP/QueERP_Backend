@@ -8,14 +8,14 @@ const businessSetupService = require("../services/BusinessSetupService");
 //////////////////////////////////////////////////////
 exports.createBusiness = async (req, res) => {
   try {
-    const { name, country } = req.body;
+    const { name, country, businessType } = req.body;
     const userId = req.user.userId;
 
     if (!name || !country) {
       return errorResponse(res, "Business Name and Country are required.", 400);
     }
 
-    const business = await businessSetupService.setupNewBusiness(name, country, userId);
+    const business = await businessSetupService.setupNewBusiness(name, country, businessType, userId);
 
     return successResponse(res, business, "Business created", 201);
   } catch (error) {

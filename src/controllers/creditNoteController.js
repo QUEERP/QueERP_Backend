@@ -99,24 +99,30 @@ exports.downloadCreditNotePdf = async (req, res) => {
 
     const credit = await prisma.creditNote.findFirst({
       where: { id, businessId },
-      select: {
-        pdfUrl: true,
-        creditNumber: true,
-      },
+      include: {
+        customer: true,
+        vendor: true,
+      }
     });
 
-    if (!credit || !credit.pdfUrl) {
-      return errorResponse(res, "PDF not found", 404);
+    if (!credit) {
+      return errorResponse(res, "Credit Note not found", 404);
     }
 
-    const downloadUrl = credit.pdfUrl.replace(
-      "/upload/",
-      "/upload/fl_attachment/"
-    );
+    const settings = await prisma.settings.findUnique({
+      where: { businessId }
+    });
 
-    return res.redirect(downloadUrl);
+    const generateCreditNotePdf = require("../utils/generateCreditNotePdf");
+    const pdfBuffer = await generateCreditNotePdf(credit, settings);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="CreditNote_${credit.creditNumber}.pdf"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    
+    return res.end(pdfBuffer);
   } catch (error) {
-    console.error("Download Credit Note Error:", error);
-    return errorResponse(res, "Download failed", 500);
+    console.error("Download Credit Note proxy error:", error);
+    return res.status(500).json({ success: false, message: "Download failed" });
   }
 };

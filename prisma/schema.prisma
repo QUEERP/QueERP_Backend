@@ -518,6 +518,7 @@ model InvoiceAuditLog {
 model InvoiceItem {
   id          String  @id @default(uuid())
   invoiceId   String
+  itemName    String?
   description String
   hsnSacCode  String?
   itemType    String?
@@ -851,11 +852,13 @@ model Expense {
   businessId    String
   title         String
   amount        Float
-  category      String
+  currency      String?  @default("AED")
+  category      String?
   paymentMethod String
   date          DateTime
   notes         String?
   vendorId      String?
+  items         ExpenseItem[]
 
   status           String  @default("Draft") // Draft, Submitted, Manager Approval, Finance Approval, Reimbursed, Rejected
   employeeId       String?
@@ -892,6 +895,23 @@ model ExpenseAuditLog {
 
   expense  Expense  @relation(fields: [expenseId], references: [id], onDelete: Cascade)
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+}
+
+model ExpenseItem {
+  id          String   @id @default(uuid())
+  expenseId   String
+  expense     Expense  @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  itemName    String?
+  description String
+  quantity    Float?
+  rate        Float?
+  taxPercent  Float?
+  taxAmount   Float?
+  amount      Float
+  category    String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model Vendor {
@@ -1359,7 +1379,7 @@ model Quotation {
   id          String   @id @default(uuid())
   businessId  String
   business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  quoteNumber String   @unique
+  quoteNumber String
   title       String?
 
   customerId String
@@ -1412,10 +1432,10 @@ model Quotation {
   updatedAt DateTime  @updatedAt
   projects  Project[]
 
-  @@index([businessId])
   @@index([customerId])
   @@index([dealId])
   @@index([isDeleted])
+  @@unique([businessId, quoteNumber])
 }
 
 model QuotationItem {
@@ -1426,6 +1446,7 @@ model QuotationItem {
   productId String?
   product   Product? @relation(fields: [productId], references: [id])
 
+  itemName    String?
   description String
   itemType    String? @default("GOODS")
   hsnSacCode  String?
@@ -1448,7 +1469,7 @@ model SalesOrder {
   id          String   @id @default(uuid())
   businessId  String
   business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  orderNumber String   @unique
+  orderNumber String
 
   customerId String
   customer   Customer @relation(fields: [customerId], references: [id])
@@ -1508,10 +1529,10 @@ model SalesOrder {
   updatedAt DateTime  @updatedAt
   projects  Project[]
 
-  @@index([businessId])
   @@index([customerId])
   @@index([quotationId])
   @@index([isDeleted])
+  @@unique([businessId, orderNumber])
 }
 
 model SalesOrderItem {

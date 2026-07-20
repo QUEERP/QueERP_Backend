@@ -153,6 +153,18 @@ const createInvoice = async (businessId, userId, userEmail, data) => {
         adminNote: data.adminNote || null,
         designTemplate: data.designTemplate || "modern",
         projectId: data.projectId || null,
+        cgst: data.cgst || 0,
+        sgst: data.sgst || 0,
+        igst: data.igst || 0,
+        tds: data.tds || 0,
+        vatAmount: data.vatAmount || 0,
+        vatPercentage: data.vatPercentage || 0,
+        vatType: data.vatType || null,
+        emirate: data.emirate || null,
+        ewayBillNo: data.ewayBillNo || null,
+        transportDetails: data.transportDetails || null,
+        reverseCharge: data.reverseCharge || false,
+        shippingCharges: data.shippingCharges || 0,
         items: {
           create: processedItems
         }
@@ -411,6 +423,20 @@ const updateInvoice = async (businessId, userId, userEmail, invoiceId, data) => 
         dueDate: data.dueDate !== undefined ? (data.dueDate ? new Date(data.dueDate) : null) : existing.dueDate,
         terms: data.terms !== undefined ? data.terms : existing.terms,
         adminNote: data.adminNote !== undefined ? data.adminNote : existing.adminNote,
+        designTemplate: data.designTemplate !== undefined ? data.designTemplate : existing.designTemplate,
+        projectId: data.projectId !== undefined ? data.projectId : existing.projectId,
+        cgst: data.cgst !== undefined ? data.cgst : existing.cgst,
+        sgst: data.sgst !== undefined ? data.sgst : existing.sgst,
+        igst: data.igst !== undefined ? data.igst : existing.igst,
+        tds: data.tds !== undefined ? data.tds : existing.tds,
+        vatAmount: data.vatAmount !== undefined ? data.vatAmount : existing.vatAmount,
+        vatPercentage: data.vatPercentage !== undefined ? data.vatPercentage : existing.vatPercentage,
+        vatType: data.vatType !== undefined ? data.vatType : existing.vatType,
+        emirate: data.emirate !== undefined ? data.emirate : existing.emirate,
+        ewayBillNo: data.ewayBillNo !== undefined ? data.ewayBillNo : existing.ewayBillNo,
+        transportDetails: data.transportDetails !== undefined ? data.transportDetails : existing.transportDetails,
+        reverseCharge: data.reverseCharge !== undefined ? data.reverseCharge : existing.reverseCharge,
+        shippingCharges: data.shippingCharges !== undefined ? data.shippingCharges : existing.shippingCharges,
         items: data.items ? {
           create: pricing.processedItems
         } : undefined

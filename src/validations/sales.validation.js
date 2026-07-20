@@ -2,8 +2,9 @@ const { z } = require("zod");
 
 // Item validation helper schema
 const lineItemSchema = z.object({
-  productId: z.string().uuid().optional().nullable(),
-  description: z.string().min(1, "Item description is required"),
+  productId: z.union([z.string().uuid(), z.literal(""), z.null()]).optional().transform(v => v === "" ? null : v),
+  itemName: z.string().optional().nullable(),
+  description: z.string().optional().nullable(),
   itemType: z.enum(["GOODS", "SERVICE"]).default("GOODS"),
   hsnSacCode: z.string().optional().nullable(),
   quantity: z.number().optional().default(0),
@@ -103,6 +104,18 @@ const createInvoiceSchema = z.object({
   adminNote: z.string().optional().nullable(),
   designTemplate: z.string().default("modern"),
   projectId: z.string().uuid("Invalid project ID").optional().nullable(),
+  cgst: z.number().optional().nullable(),
+  sgst: z.number().optional().nullable(),
+  igst: z.number().optional().nullable(),
+  tds: z.number().optional().nullable(),
+  vatAmount: z.number().optional().nullable(),
+  vatPercentage: z.number().optional().nullable(),
+  vatType: z.string().optional().nullable(),
+  emirate: z.string().optional().nullable(),
+  ewayBillNo: z.string().optional().nullable(),
+  transportDetails: z.string().optional().nullable(),
+  reverseCharge: z.boolean().optional().nullable(),
+  shippingCharges: z.number().optional().nullable(),
   items: z.array(
     lineItemSchema.extend({
       hours: z.number().optional().default(0), // support existing hours logic
@@ -128,6 +141,20 @@ const updateInvoiceSchema = z.object({
   currency: z.string().length(3).optional(),
   terms: z.string().optional().nullable(),
   adminNote: z.string().optional().nullable(),
+  designTemplate: z.string().optional().nullable(),
+  projectId: z.string().uuid("Invalid project ID").optional().nullable(),
+  cgst: z.number().optional().nullable(),
+  sgst: z.number().optional().nullable(),
+  igst: z.number().optional().nullable(),
+  tds: z.number().optional().nullable(),
+  vatAmount: z.number().optional().nullable(),
+  vatPercentage: z.number().optional().nullable(),
+  vatType: z.string().optional().nullable(),
+  emirate: z.string().optional().nullable(),
+  ewayBillNo: z.string().optional().nullable(),
+  transportDetails: z.string().optional().nullable(),
+  reverseCharge: z.boolean().optional().nullable(),
+  shippingCharges: z.number().optional().nullable(),
   items: z.array(lineItemSchema).min(1).optional()
 });
 

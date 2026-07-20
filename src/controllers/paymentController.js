@@ -296,23 +296,38 @@ exports.downloadPaymentPdf = async (req, res) => {
       },
     });
 
-    if (!payment?.pdfUrl) {
+    if (!payment) {
       return res.status(404).json({
         success: false,
-        message: "PDF not found",
+        message: "Payment not found",
       });
     }
 
-    const downloadUrl = payment.pdfUrl.replace(
-      "/upload/",
-      "/upload/fl_attachment/"
-    );
+    // Since Cloudinary is blocking PDF delivery (401), dynamically generate the PDF and send it
+    const generatePaymentPdfHelper = require("../utils/generatePaymentPdf");
+    
+    // Fetch associated invoice and settings for the template
+    const invoice = await prisma.invoice.findUnique({
+      where: { id: payment.invoiceId },
+      include: { customer: true, payments: true }
+    });
+    
+    const settings = await prisma.settings.findUnique({
+      where: { businessId: req.business.id }
+    });
 
-    return res.redirect(downloadUrl);
+    const pdfBuffer = await generatePaymentPdfHelper(payment, invoice, settings);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Payment_Slip_${payment.paymentNumber || payment.id}.pdf"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    
+    return res.end(pdfBuffer);
   } catch (error) {
+    console.error("PDF download proxy error:", error);
     return res.status(500).json({
       success: false,
-      message: error.message,
+      message: "Failed to download PDF",
     });
   }
 };

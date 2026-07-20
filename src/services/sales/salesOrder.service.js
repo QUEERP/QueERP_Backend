@@ -101,7 +101,7 @@ const createSalesOrder = async (businessId, userId, userEmail, data) => {
         notes: data.notes || null,
         items: {
           create: pricing.processedItems.map(item => {
-            const { warehouseId, productId, ...rest } = item;
+            const { warehouseId, productId, itemName, ...rest } = item;
             const payload = { ...rest };
             if (productId) payload.product = { connect: { id: productId } };
             if (warehouseId) payload.warehouse = { connect: { id: warehouseId } };
@@ -287,7 +287,7 @@ const updateSalesOrder = async (businessId, userId, userEmail, orderId, data) =>
         notes: data.notes !== undefined ? data.notes : existing.notes,
         items: data.items ? {
           create: pricing.processedItems.map(item => {
-            const { warehouseId, productId, ...rest } = item;
+            const { warehouseId, productId, itemName, ...rest } = item;
             const payload = { ...rest };
             if (productId) payload.product = { connect: { id: productId } };
             if (warehouseId) payload.warehouse = { connect: { id: warehouseId } };

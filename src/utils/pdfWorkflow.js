@@ -45,7 +45,8 @@ module.exports = async (pdfBuffer, documentNumber, folderName = "pdfs") => {
           public_id: documentNumber,
           overwrite: true,
           unique_filename: true,
-          format: "pdf"
+          format: "pdf",
+          timeout: 120000 // Increase timeout to 120 seconds
         },
         (error, result) => {
           if (error) return reject(error);
