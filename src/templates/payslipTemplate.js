@@ -253,16 +253,21 @@ ${unpaidLeaves > 0 ? `
 
 </table>
 
-<div class="footer">
+<div class="footer" style="display:flex; justify-content:space-between; align-items:flex-end;">
 
+<div style="text-align:left;">
 <strong>${symbol} ${Number(payslip.netSalary).toLocaleString()}</strong><br>
 ${getCurrencyName(symbol)} ${Number(payslip.netSalary).toLocaleString()} Only
+</div>
 
-<br><br>
-
-<em>
-This is a system generated statement and does not require any signature or stamp
-</em>
+<div style="text-align:right; margin-top:30px;">
+  <div style="display:inline-block; text-align:center;">
+    ${settings?.signatureUrl ? `<img src="${settings.signatureUrl}" style="max-height:70px; max-width:150px; object-fit:contain; object-position:center; margin-bottom:5px;" />` : '<div style="height:75px;"></div>'}
+    <div style="border-top:1px solid #111; width:200px; padding-top:5px; font-weight:bold; font-size:14px;">
+      Authorized Signature
+    </div>
+  </div>
+</div>
 
 </div>
 

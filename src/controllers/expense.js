@@ -14,13 +14,14 @@ exports.createExpense = async (req, res) => {
       paymentMethod,
       date,
       notes,
-      vendorId
+      vendorId,
+      currency
     } = req.body;
 
-    if (!title || !amount || !category) {
+    if (!title || amount === undefined) {
       return res.status(400).json({
         success: false,
-        message: "title, amount, category required"
+        message: "title and amount are required"
       });
     }
 
@@ -50,7 +51,31 @@ exports.createExpense = async (req, res) => {
         date: date ? new Date(date) : new Date(),
         notes,
         vendorId,
-        projectId: req.body.projectId || null
+        projectId: req.body.projectId || null,
+        currency: currency || 'AED',
+        items: req.body.items && req.body.items.length > 0 ? {
+          create: req.body.items.map(item => {
+            const q = Number(item.quantity || 0);
+            const r = Number(item.rate || 0);
+            const t = Number(item.taxPercent || 0);
+            const taxAmount = (q * r * t) / 100;
+            const amt = (q * r) + taxAmount;
+            return {
+              itemName: item.itemName || null,
+              description: item.description || '',
+              quantity: q,
+              rate: r,
+              taxPercent: t,
+              taxAmount: taxAmount,
+              amount: amt,
+              category: item.category || null
+            }
+          })
+        } : undefined
+      },
+      include: {
+        items: true,
+        vendor: true
       }
     });
 
@@ -81,7 +106,7 @@ exports.getExpenses = async (req, res) => {
 
   const expenses = await prisma.expense.findMany({
     where: { businessId },
-    include: { vendor: true },
+    include: { vendor: true, items: true },
     orderBy: { date: "desc" }
   });
 
@@ -97,7 +122,7 @@ exports.getExpense = async (req, res) => {
 
   const expense = await prisma.expense.findFirst({
     where: { id, businessId },
-    include: { vendor: true }
+    include: { vendor: true, items: true }
   });
 
   if (!expense) {
@@ -128,9 +153,35 @@ exports.updateExpense = async (req, res) => {
     });
   }
 
+  const updateData = { ...req.body };
+  if (updateData.items) {
+    // Basic support for updating items: delete old and create new
+    await prisma.expenseItem.deleteMany({ where: { expenseId: id } });
+    updateData.items = {
+      create: req.body.items.map(item => {
+        const q = Number(item.quantity || 0);
+        const r = Number(item.rate || 0);
+        const t = Number(item.taxPercent || 0);
+        const taxAmount = (q * r * t) / 100;
+        const amt = (q * r) + taxAmount;
+        return {
+          itemName: item.itemName || null,
+          description: item.description || '',
+          quantity: q,
+          rate: r,
+          taxPercent: t,
+          taxAmount: taxAmount,
+          amount: amt,
+          category: item.category || null
+        }
+      })
+    };
+  }
+
   const updated = await prisma.expense.update({
     where: { id },
-    data: req.body
+    data: updateData,
+    include: { items: true, vendor: true }
   });
 
   res.json({ success: true, data: updated });

@@ -2,7 +2,7 @@ const prisma = require("../config/prisma");
 const { getCountryData } = require("../utils/countryHelper");
 
 class BusinessSetupService {
-  async setupNewBusiness(name, country, userId) {
+  async setupNewBusiness(name, country, businessType, userId) {
     const countryInfo = getCountryData(country); // country is now CCA2 code like 'IN', 'AE'
     
     // Fallback if country info not found
@@ -39,6 +39,7 @@ class BusinessSetupService {
           currencySymbol: currencySymbol,
           taxType: taxType,
           currency: currencyCode, // Keeping old field populated to prevent immediate breakages
+          businessType: businessType || "Other",
           ownerId: userId,
           isActive: false, // Wait for subscription/admin approval if needed, though prompt says "immediately after creation"
         }

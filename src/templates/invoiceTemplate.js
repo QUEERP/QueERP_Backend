@@ -1,6 +1,15 @@
 module.exports = (invoice, settings = {}) => {
   const template = settings.invoiceTemplate || invoice.designTemplate || "modern";
   
+  const getSymbol = (curr) => {
+    if (curr === 'INR') return '₹';
+    if (curr === 'USD') return '$';
+    if (curr === 'EUR') return '€';
+    if (curr === 'GBP') return '£';
+    return curr;
+  };
+  const sym = getSymbol(invoice.currency) || invoice.currency || '$';
+
   // Helper to format currency
   const fmt = (val) => (val || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   
@@ -34,7 +43,7 @@ module.exports = (invoice, settings = {}) => {
 
     itemizedTaxes.push({
       index: idx + 1,
-      description: item.description,
+      description: item.itemName ? item.itemName + (item.description ? ' - ' + item.description : '') : item.description,
       taxes: itemTaxes
     });
   });
@@ -173,7 +182,7 @@ module.exports = (invoice, settings = {}) => {
         ${(invoice.items || []).map((i, idx) => `
         <tr>
           <td style="text-align:center; font-weight:bold;">${idx + 1}</td>
-          <td>${i.description}</td>
+          <td>${i.itemName ? '<b>' + i.itemName + '</b><br/>' : ''}${i.description}</td>
           <td style="text-align:center;">${i.quantity || i.hours || 0}</td>
           <td style="text-align:right;">${fmt(i.rate)}</td>
           <td style="text-align:right;">${fmt(i.totalAmount)}</td>
@@ -321,7 +330,7 @@ module.exports = (invoice, settings = {}) => {
       <tbody>
         ${(invoice.items || []).map((i) => `
         <tr>
-          <td style="font-weight:bold; color:#333;">${i.description}</td>
+            <td style="font-weight:bold; color:#333;">${i.itemName ? i.itemName + ' - ' : ''}${i.description}</td>
           <td style="text-align:center;">${fmt(i.rate)}</td>
           <td style="text-align:center;">${i.quantity || i.hours || 0}</td>
           <td style="text-align:right;">${fmt(i.totalAmount)}</td>
@@ -510,7 +519,10 @@ module.exports = (invoice, settings = {}) => {
         ${(invoice.items || []).map((i, idx) => `
         <tr>
           <td class="text-center">${idx + 1}</td>
-          <td>${i.description}</td>
+          <td>
+            <div style="font-weight:600; color:#111;">${i.itemName || ''}</div>
+            <div style="${i.itemName ? 'color:#555; margin-top:2px; font-size:9px;' : ''}">${i.description}</div>
+          </td>
           <td class="text-center">${i.hsnSacCode || '-'}</td>
           <td class="text-center">${i.quantity || i.hours || 0}</td>
           <td class="text-center">${fmt(i.rate)}</td>
