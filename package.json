@@ -14,7 +14,7 @@
     "dev": "nodemon --trace-warnings server.js",
     "start": "node --trace-warnings server.js",
     "prisma:generate": "prisma generate",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate && npx puppeteer browsers install chrome"
   },
   "keywords": [],
   "author": "",
