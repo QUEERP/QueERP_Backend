@@ -4,7 +4,7 @@
  * Handles both local (Windows/Linux) and production (Lambda/serverless) environments.
  */
 
-const puppeteer = require("puppeteer-core");
+const puppeteer = require("puppeteer");
 const chromium  = require("@sparticuz/chromium");
 const https     = require("https");
 const http      = require("http");
@@ -31,9 +31,10 @@ async function getExecPath() {
     return process.env.PUPPETEER_EXECUTABLE_PATH;
   }
 
+  const fs = require("fs");
+
   // 2. Windows default Chrome path
   if (process.platform === "win32") {
-    const fs = require("fs");
     const winPaths = [
       "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
       "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
@@ -43,8 +44,29 @@ async function getExecPath() {
     }
   }
 
-  // 3. Serverless / Lambda — use @sparticuz/chromium
-  return await chromium.executablePath();
+  // 3. Linux default paths (for VPS / Render)
+  if (process.platform === "linux") {
+    const linuxPaths = [
+      "/usr/bin/google-chrome",
+      "/usr/bin/google-chrome-stable",
+      "/usr/bin/chromium-browser",
+      "/usr/bin/chromium",
+    ];
+    for (const p of linuxPaths) {
+      if (fs.existsSync(p)) return p;
+    }
+  }
+
+  // 4. Serverless / Lambda — use @sparticuz/chromium
+  try {
+    const sparticuzPath = await chromium.executablePath();
+    if (sparticuzPath) return sparticuzPath;
+  } catch (err) {
+    console.warn("[Browser] Sparticuz path resolution failed:", err.message);
+  }
+
+  // 5. Fallback to null, allowing require('puppeteer') to use its bundled browser
+  return null;
 }
 
 /**
@@ -145,15 +167,20 @@ async function inlineExternalImages(html) {
  */
 async function launchBrowser() {
   const execPath = await getExecPath();
-  console.log(`[Browser] Using Chrome at: ${execPath}`);
+  console.log(`[Browser] Using Chrome at: ${execPath || 'default bundled chromium'}`);
 
-  const browser = await puppeteer.launch({
-    executablePath: execPath,
+  const launchOptions = {
     headless: "new",
     args: CHROME_ARGS,
     defaultViewport: { width: 1200, height: 1600 },
     timeout: 60000,
-  });
+  };
+
+  if (execPath) {
+    launchOptions.executablePath = execPath;
+  }
+
+  const browser = await puppeteer.launch(launchOptions);
 
   return browser;
 }
