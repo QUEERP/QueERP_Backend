@@ -135,3 +135,43 @@ exports.rejectQuotation = async (req, res) => {
     return errorResponse(res, error.message, 400);
   }
 };
+
+//////////////////////////////////////////////////////
+// DOWNLOAD PDF
+//////////////////////////////////////////////////////
+exports.downloadQuotationPdf = async (req, res) => {
+  try {
+    const businessId = req.business.id;
+    const { id } = req.params;
+
+    const prisma = require("../config/prisma");
+    const quotation = await prisma.quotation.findFirst({
+      where: { id, businessId },
+      include: { customer: true, items: true }
+    });
+
+    if (!quotation) {
+      return res.status(404).json({ success: false, message: "Quotation not found" });
+    }
+
+    const generateQuotationPdf = require("../utils/generateQuotationPdf");
+    
+    const settings = await prisma.settings.findUnique({
+      where: { businessId: req.business.id }
+    });
+    
+    const pdfSettings = settings || { companyName: "Your Company", signatureUrl: null };
+    const pdfBuffer = await generateQuotationPdf(quotation, pdfSettings);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Quotation_${quotation.quoteNumber || id}.pdf"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    
+    return res.end(pdfBuffer);
+  } catch (err) {
+    console.error("downloadQuotationPdf controller error:", err);
+    if (!res.headersSent) {
+      return res.status(500).json({ success: false, message: err.message });
+    }
+  }
+};

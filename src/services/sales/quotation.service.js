@@ -336,9 +336,7 @@ const changeStatus = async (businessId, userId, userEmail, quotationId, status) 
         else if (hasGoods) executionType = "PRODUCT";
       }
 
-      const projCount = await tx.project.count({ where: { businessId } });
-      const projectCode = `PRJ-${String(projCount + 1).padStart(5, '0')}`;
-
+      const projectCode = await generateDocNumber(tx, businessId, "PRJ", "project", "projectCode");
       const project = await tx.project.create({
         data: {
           businessId,
