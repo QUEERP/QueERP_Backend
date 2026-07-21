@@ -1,3 +1,4 @@
+const prisma = require("../config/prisma");
 const { htmlToPdfBuffer } = require("./launchBrowser");
 const invoiceTemplate = require("../templates/invoiceTemplate");
 
@@ -10,6 +11,12 @@ const invoiceTemplate = require("../templates/invoiceTemplate");
 module.exports = async (invoice, settings) => {
   try {
     console.log("[generateInvoicePdf] Generating for invoice:", invoice?.invoiceNumber);
+    if (invoice?.businessId) {
+      const business = await prisma.business.findUnique({ where: { id: invoice.businessId } });
+      if (business && settings) {
+        settings.businessType = business.businessType;
+      }
+    }
     const html = invoiceTemplate(invoice, settings);
     const buffer = await htmlToPdfBuffer(html);
     console.log("[generateInvoicePdf] Done, buffer size:", buffer.length);
