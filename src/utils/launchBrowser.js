@@ -198,9 +198,18 @@ async function launchBrowser() {
     browser = await puppeteer.launch(launchOptions);
   } catch (err) {
     if (err.message.includes("Could not find Chrome") || err.message.includes("Could not find expected browser")) {
-      console.log("[Browser] Chrome not found. Running auto-installation...");
+      console.log("[Browser] Chrome not found. Running precise auto-installation...");
+      
+      // Extract exact version from error (e.g., "Could not find Chrome (ver. 127.0.6533.88)")
+      let version = "127.0.6533.88"; // Fallback to 127.0.6533.88 for puppeteer 22.15.0
+      const match = err.message.match(/ver\. ([\d\.]+)/);
+      if (match && match[1]) {
+        version = match[1];
+      }
+
+      console.log(`[Browser] Missing version detected as: ${version}. Downloading...`);
       const { execSync } = require('child_process');
-      execSync("npx puppeteer browsers install chrome", { stdio: 'inherit' });
+      execSync(`npx @puppeteer/browsers install chrome@${version}`, { stdio: 'inherit' });
       console.log("[Browser] Auto-installation complete. Retrying launch...");
       
       // Retry launch
