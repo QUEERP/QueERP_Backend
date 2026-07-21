@@ -207,9 +207,21 @@ async function launchBrowser() {
         version = match[1];
       }
 
-      console.log(`[Browser] Missing version detected as: ${version}. Downloading...`);
+      // Extract exact cache path from error (e.g., "which is: /home/sbx_user1051/.cache/puppeteer)")
+      let cachePath = "";
+      const pathMatch = err.message.match(/which is: (.*?)\)/);
+      if (pathMatch && pathMatch[1]) {
+        cachePath = pathMatch[1].trim();
+      }
+
+      console.log(`[Browser] Missing version detected as: ${version}. Downloading to ${cachePath || 'default'}...`);
       const { execSync } = require('child_process');
-      execSync(`npx @puppeteer/browsers install chrome@${version}`, { stdio: 'inherit' });
+      const cmd = cachePath 
+        ? `npx @puppeteer/browsers install chrome@${version} --path ${cachePath}` 
+        : `npx @puppeteer/browsers install chrome@${version}`;
+      
+      console.log(`[Browser] Executing: ${cmd}`);
+      execSync(cmd, { stdio: 'inherit' });
       console.log("[Browser] Auto-installation complete. Retrying launch...");
       
       // Retry launch
