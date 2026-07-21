@@ -7,12 +7,11 @@
   "engines": {
     "node": ">=18.0.0"
   },
-
   "scripts": {
     "dev": "nodemon --trace-warnings server.js",
     "start": "node --trace-warnings server.js",
     "prisma:generate": "prisma generate",
-    "postinstall": "prisma generate && npx puppeteer browsers install chrome"
+    "postinstall": "prisma generate"
   },
   "keywords": [],
   "author": "",
@@ -21,7 +20,7 @@
     "@neondatabase/serverless": "^1.1.0",
     "@prisma/adapter-pg": "^7.3.0",
     "@prisma/client": "^7.3.0",
-    "@sparticuz/chromium": "^143.0.4",
+    "@sparticuz/chromium": "127.0.0",
     "axios": "^1.13.5",
     "bcryptjs": "^3.0.3",
     "cloudinary": "^1.41.3",
