@@ -57,12 +57,24 @@ async function getExecPath() {
     }
   }
 
-  // 4. Serverless / Lambda — use @sparticuz/chromium
+  // 4. Serverless / Lambda / Vercel — use @sparticuz/chromium
   try {
-    const sparticuzPath = await chromium.executablePath();
+    const sparticuzUrl = "https://github.com/Sparticuz/chromium/releases/download/v127.0.0/chromium-v127.0.0-pack.tar";
+    console.log("[Browser] Attempting Sparticuz Chromium resolution...");
+    let sparticuzPath = await chromium.executablePath();
+    if (!sparticuzPath || sparticuzPath.includes("null")) {
+      console.log("[Browser] Local Sparticuz empty, downloading from remote...");
+      sparticuzPath = await chromium.executablePath(sparticuzUrl);
+    }
     if (sparticuzPath) return sparticuzPath;
   } catch (err) {
-    console.warn("[Browser] Sparticuz path resolution failed:", err.message);
+    console.warn("[Browser] Sparticuz resolution failed. Retrying with explicit URL. Error:", err.message);
+    try {
+      const fallbackPath = await chromium.executablePath("https://github.com/Sparticuz/chromium/releases/download/v127.0.0/chromium-v127.0.0-pack.tar");
+      if (fallbackPath) return fallbackPath;
+    } catch (e) {
+      console.warn("[Browser] Sparticuz remote fallback also failed:", e.message);
+    }
   }
 
   // 5. Fallback to null, allowing require('puppeteer') to use its bundled browser
@@ -167,12 +179,13 @@ async function inlineExternalImages(html) {
  */
 async function launchBrowser() {
   const execPath = await getExecPath();
-  console.log(`[Browser] Using Chrome at: ${execPath || 'default bundled chromium'}`);
+  const isSparticuz = execPath && execPath.includes('/tmp/');
+  console.log(`[Browser] Using Chrome at: ${execPath || 'default bundled chromium'} (Sparticuz: ${!!isSparticuz})`);
 
   const launchOptions = {
-    headless: "new",
-    args: CHROME_ARGS,
-    defaultViewport: { width: 1200, height: 1600 },
+    headless: isSparticuz ? chromium.headless : "new",
+    args: isSparticuz ? chromium.args : CHROME_ARGS,
+    defaultViewport: isSparticuz ? chromium.defaultViewport : { width: 1200, height: 1600 },
     timeout: 60000,
   };
 
@@ -180,7 +193,22 @@ async function launchBrowser() {
     launchOptions.executablePath = execPath;
   }
 
-  const browser = await puppeteer.launch(launchOptions);
+  let browser;
+  try {
+    browser = await puppeteer.launch(launchOptions);
+  } catch (err) {
+    if (err.message.includes("Could not find Chrome") || err.message.includes("Could not find expected browser")) {
+      console.log("[Browser] Chrome not found. Running auto-installation...");
+      const { execSync } = require('child_process');
+      execSync("npx puppeteer browsers install chrome", { stdio: 'inherit' });
+      console.log("[Browser] Auto-installation complete. Retrying launch...");
+      
+      // Retry launch
+      browser = await puppeteer.launch(launchOptions);
+    } else {
+      throw err;
+    }
+  }
 
   return browser;
 }
