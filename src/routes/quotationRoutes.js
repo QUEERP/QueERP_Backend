@@ -58,4 +58,12 @@ router.post(
   Controller.rejectQuotation
 );
 
+router.get(
+  "/:id/download-pdf",
+  auth,
+  business,
+  checkPermission("quotation", "read"),
+  Controller.downloadQuotationPdf
+);
+
 module.exports = router;
