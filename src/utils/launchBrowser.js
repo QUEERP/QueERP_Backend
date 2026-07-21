@@ -60,21 +60,18 @@ async function getExecPath() {
   // 4. Serverless / Lambda / Vercel — use @sparticuz/chromium
   try {
     const sparticuzUrl = "https://github.com/Sparticuz/chromium/releases/download/v127.0.0/chromium-v127.0.0-pack.tar";
-    console.log("[Browser] Attempting Sparticuz Chromium resolution...");
-    let sparticuzPath = await chromium.executablePath();
-    if (!sparticuzPath || sparticuzPath.includes("null")) {
-      console.log("[Browser] Local Sparticuz empty, downloading from remote...");
-      sparticuzPath = await chromium.executablePath(sparticuzUrl);
+    // Check if we are on Vercel or AWS Lambda
+    if (process.env.VERCEL || process.env.AWS_EXECUTION_ENV || process.env.AWS_REGION) {
+      console.log("[Browser] Vercel/AWS detected. Using remote Sparticuz URL directly.");
+      const sparticuzPath = await chromium.executablePath(sparticuzUrl);
+      if (sparticuzPath) return sparticuzPath;
+    } else {
+      console.log("[Browser] Attempting local Sparticuz Chromium resolution...");
+      const sparticuzPath = await chromium.executablePath();
+      if (sparticuzPath) return sparticuzPath;
     }
-    if (sparticuzPath) return sparticuzPath;
   } catch (err) {
-    console.warn("[Browser] Sparticuz resolution failed. Retrying with explicit URL. Error:", err.message);
-    try {
-      const fallbackPath = await chromium.executablePath("https://github.com/Sparticuz/chromium/releases/download/v127.0.0/chromium-v127.0.0-pack.tar");
-      if (fallbackPath) return fallbackPath;
-    } catch (e) {
-      console.warn("[Browser] Sparticuz remote fallback also failed:", e.message);
-    }
+    console.warn("[Browser] Sparticuz resolution failed:", err.message);
   }
 
   // 5. Fallback to null, allowing require('puppeteer') to use its bundled browser
@@ -221,7 +218,25 @@ async function launchBrowser() {
         : `npx @puppeteer/browsers install chrome@${version}`;
       
       console.log(`[Browser] Executing: ${cmd}`);
-      execSync(cmd, { stdio: 'inherit' });
+      
+      // Capture the output to extract the exact installed path
+      const output = execSync(cmd, { encoding: 'utf-8' });
+      console.log(`[Browser] Install Output:\n${output}`);
+
+      // The output contains multiple lines (e.g. Downloading... \n chrome@127.0... /path/to/chrome)
+      const lines = output.split('\n');
+      for (const line of lines) {
+        if (line.trim().startsWith('chrome@')) {
+          const parts = line.trim().split(' ');
+          if (parts.length >= 2) {
+            const exactInstalledPath = parts[1].trim();
+            console.log(`[Browser] Forcing Puppeteer to use explicit path: ${exactInstalledPath}`);
+            launchOptions.executablePath = exactInstalledPath;
+            break;
+          }
+        }
+      }
+
       console.log("[Browser] Auto-installation complete. Retrying launch...");
       
       // Retry launch
