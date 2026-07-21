@@ -7,9 +7,7 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "puppeteer": {
-    "cacheDirectory": "/opt/render/.cache/puppeteer"
-  },
+
   "scripts": {
     "dev": "nodemon --trace-warnings server.js",
     "start": "node --trace-warnings server.js",
