@@ -1,13 +1,15 @@
 /**
  * launchBrowser.js
  * Centralized Puppeteer browser launcher.
- * Handles both local (Windows/Linux) and production (Lambda/serverless) environments.
+ * Handles both local (Windows/Linux) and production (Vercel/Lambda/serverless) environments.
+ *
+ * Strategy:
+ *   - On Vercel / AWS Lambda: uses puppeteer-core + @sparticuz/chromium (downloads binary to /tmp)
+ *   - On local Windows/Linux: uses puppeteer (which has bundled Chrome)
  */
 
-const puppeteer = require("puppeteer");
-const chromium  = require("@sparticuz/chromium");
-const https     = require("https");
-const http      = require("http");
+const https = require("https");
+const http  = require("http");
 
 const CHROME_ARGS = [
   "--no-sandbox",
@@ -25,27 +27,67 @@ const CHROME_ARGS = [
   "--disable-features=VizDisplayCompositor",
 ];
 
-async function getExecPath() {
-  // 1. Explicit override (e.g. set in .env for local dev)
-  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
-    return process.env.PUPPETEER_EXECUTABLE_PATH;
+// Vercel sets VERCEL=1, AWS Lambda sets AWS_EXECUTION_ENV or AWS_LAMBDA_FUNCTION_NAME
+// The sbx_user home path is another signal for Vercel's Lambda sandbox
+function isServerless() {
+  return !!(
+    process.env.VERCEL ||
+    process.env.AWS_EXECUTION_ENV ||
+    process.env.AWS_LAMBDA_FUNCTION_NAME ||
+    (process.env.HOME && process.env.HOME.includes("sbx_user"))
+  );
+}
+
+/**
+ * Launch a Puppeteer browser instance.
+ * Always call browser.close() in a finally block.
+ * @returns {Promise<Browser>}
+ */
+async function launchBrowser() {
+  // ── SERVERLESS PATH (Vercel / AWS Lambda) ──────────────────────────────────
+  if (isServerless()) {
+    console.log("[Browser] Serverless environment detected (Vercel/Lambda). Using @sparticuz/chromium.");
+
+    const chromium = require("@sparticuz/chromium");
+    const puppeteerCore = require("puppeteer-core");
+
+    // Pass the remote tarball URL so chromium downloads its binary into /tmp at runtime.
+    // This is the ONLY approach that works on Vercel's read-only filesystem.
+    const SPARTICUZ_URL =
+      "https://github.com/Sparticuz/chromium/releases/download/v127.0.0/chromium-v127.0.0-pack.tar";
+
+    const execPath = await chromium.executablePath(SPARTICUZ_URL);
+    console.log(`[Browser] Sparticuz executablePath: ${execPath}`);
+
+    const browser = await puppeteerCore.launch({
+      executablePath: execPath,
+      headless: chromium.headless,
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      timeout: 60000,
+    });
+
+    return browser;
   }
 
+  // ── LOCAL PATH (Windows / Linux VPS) ───────────────────────────────────────
+  console.log("[Browser] Local environment detected. Using puppeteer with bundled Chrome.");
+  const puppeteer = require("puppeteer");
   const fs = require("fs");
 
-  // 2. Windows default Chrome path
-  if (process.platform === "win32") {
+  let execPath = process.env.PUPPETEER_EXECUTABLE_PATH || null;
+
+  if (!execPath && process.platform === "win32") {
     const winPaths = [
       "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
       "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
     ];
     for (const p of winPaths) {
-      if (fs.existsSync(p)) return p;
+      if (fs.existsSync(p)) { execPath = p; break; }
     }
   }
 
-  // 3. Linux default paths (for VPS / Render)
-  if (process.platform === "linux") {
+  if (!execPath && process.platform === "linux") {
     const linuxPaths = [
       "/usr/bin/google-chrome",
       "/usr/bin/google-chrome-stable",
@@ -53,30 +95,28 @@ async function getExecPath() {
       "/usr/bin/chromium",
     ];
     for (const p of linuxPaths) {
-      if (fs.existsSync(p)) return p;
+      if (fs.existsSync(p)) { execPath = p; break; }
     }
   }
 
-  // 4. Serverless / Lambda / Vercel — use @sparticuz/chromium
-  try {
-    const sparticuzUrl = "https://github.com/Sparticuz/chromium/releases/download/v127.0.0/chromium-v127.0.0-pack.tar";
-    // Check if we are on Vercel or AWS Lambda
-    if (process.env.VERCEL || process.env.AWS_EXECUTION_ENV || process.env.AWS_REGION) {
-      console.log("[Browser] Vercel/AWS detected. Using remote Sparticuz URL directly.");
-      const sparticuzPath = await chromium.executablePath(sparticuzUrl);
-      if (sparticuzPath) return sparticuzPath;
-    } else {
-      console.log("[Browser] Attempting local Sparticuz Chromium resolution...");
-      const sparticuzPath = await chromium.executablePath();
-      if (sparticuzPath) return sparticuzPath;
-    }
-  } catch (err) {
-    console.warn("[Browser] Sparticuz resolution failed:", err.message);
+  const launchOptions = {
+    headless: "new",
+    args: CHROME_ARGS,
+    defaultViewport: { width: 1200, height: 1600 },
+    timeout: 60000,
+  };
+
+  if (execPath) {
+    launchOptions.executablePath = execPath;
+    console.log(`[Browser] Using explicit Chrome path: ${execPath}`);
+  } else {
+    console.log("[Browser] Using puppeteer bundled Chrome.");
   }
 
-  // 5. Fallback to null, allowing require('puppeteer') to use its bundled browser
-  return null;
+  return puppeteer.launch(launchOptions);
 }
+
+// ── Image helpers ─────────────────────────────────────────────────────────────
 
 /**
  * Fetch a URL and return it as a base64 data URI.
@@ -134,7 +174,6 @@ async function urlToBase64(url) {
  * @returns {Promise<string>}
  */
 async function inlineExternalImages(html) {
-  // Match src="http..." or src='http...' patterns
   const srcPattern = /src=["'](https?:\/\/[^"']+)["']/g;
   const matches = [...html.matchAll(srcPattern)];
 
@@ -142,10 +181,8 @@ async function inlineExternalImages(html) {
 
   console.log(`[PDF] Pre-fetching ${matches.length} external image(s)...`);
 
-  // Deduplicate URLs
   const uniqueUrls = [...new Set(matches.map((m) => m[1]))];
 
-  // Fetch all in parallel
   const base64Map = {};
   await Promise.all(
     uniqueUrls.map(async (url) => {
@@ -153,11 +190,9 @@ async function inlineExternalImages(html) {
     })
   );
 
-  // Replace all src="http..." with src="data:..."
   let inlined = html;
   for (const [url, b64] of Object.entries(base64Map)) {
     if (b64) {
-      // Escape URL for regex use
       const escaped = url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       inlined = inlined.replace(new RegExp(escaped, "g"), b64);
       console.log(`[PDF] Inlined: ${url.substring(0, 60)}...`);
@@ -170,89 +205,7 @@ async function inlineExternalImages(html) {
 }
 
 /**
- * Launch a Puppeteer browser instance.
- * Always call browser.close() in a finally block.
- * @returns {Promise<Browser>}
- */
-async function launchBrowser() {
-  const execPath = await getExecPath();
-  const isSparticuz = execPath && execPath.includes('/tmp/');
-  console.log(`[Browser] Using Chrome at: ${execPath || 'default bundled chromium'} (Sparticuz: ${!!isSparticuz})`);
-
-  const launchOptions = {
-    headless: isSparticuz ? chromium.headless : "new",
-    args: isSparticuz ? chromium.args : CHROME_ARGS,
-    defaultViewport: isSparticuz ? chromium.defaultViewport : { width: 1200, height: 1600 },
-    timeout: 60000,
-  };
-
-  if (execPath) {
-    launchOptions.executablePath = execPath;
-  }
-
-  let browser;
-  try {
-    browser = await puppeteer.launch(launchOptions);
-  } catch (err) {
-    if (err.message.includes("Could not find Chrome") || err.message.includes("Could not find expected browser")) {
-      console.log("[Browser] Chrome not found. Running precise auto-installation...");
-      
-      // Extract exact version from error (e.g., "Could not find Chrome (ver. 127.0.6533.88)")
-      let version = "127.0.6533.88"; // Fallback to 127.0.6533.88 for puppeteer 22.15.0
-      const match = err.message.match(/ver\. ([\d\.]+)/);
-      if (match && match[1]) {
-        version = match[1];
-      }
-
-      // Extract exact cache path from error (e.g., "which is: /home/sbx_user1051/.cache/puppeteer)")
-      let cachePath = "";
-      const pathMatch = err.message.match(/which is: (.*?)\)/);
-      if (pathMatch && pathMatch[1]) {
-        cachePath = pathMatch[1].trim();
-      }
-
-      console.log(`[Browser] Missing version detected as: ${version}. Downloading to ${cachePath || 'default'}...`);
-      const { execSync } = require('child_process');
-      const cmd = cachePath 
-        ? `npx @puppeteer/browsers install chrome@${version} --path ${cachePath}` 
-        : `npx @puppeteer/browsers install chrome@${version}`;
-      
-      console.log(`[Browser] Executing: ${cmd}`);
-      
-      // Capture the output to extract the exact installed path
-      const output = execSync(cmd, { encoding: 'utf-8' });
-      console.log(`[Browser] Install Output:\n${output}`);
-
-      // The output contains multiple lines (e.g. Downloading... \n chrome@127.0... /path/to/chrome)
-      const lines = output.split('\n');
-      for (const line of lines) {
-        if (line.trim().startsWith('chrome@')) {
-          const parts = line.trim().split(' ');
-          if (parts.length >= 2) {
-            const exactInstalledPath = parts[1].trim();
-            console.log(`[Browser] Forcing Puppeteer to use explicit path: ${exactInstalledPath}`);
-            launchOptions.executablePath = exactInstalledPath;
-            break;
-          }
-        }
-      }
-
-      console.log("[Browser] Auto-installation complete. Retrying launch...");
-      
-      // Retry launch
-      browser = await puppeteer.launch(launchOptions);
-    } else {
-      throw err;
-    }
-  }
-
-  return browser;
-}
-
-/**
  * Generate a PDF Buffer from an HTML string.
- * - Pre-inlines all external images as base64 to avoid network timeouts.
- * - Uses domcontentloaded instead of networkidle0 for speed and reliability.
  * @param {string} html - HTML content to render
  * @param {object} [pdfOptions] - Puppeteer PDF options
  * @returns {Promise<Buffer>}
@@ -262,44 +215,26 @@ async function htmlToPdfBuffer(html, pdfOptions = {}) {
   let browser;
 
   try {
-    // Step 1: Pre-inline all external images to avoid network timeouts
     const inlinedHtml = await inlineExternalImages(html);
 
-    // Step 2: Launch browser
     browser = await launchBrowser();
     const page = await browser.newPage();
 
-    // Block ALL external network requests during rendering
-    // (images are already inlined, so nothing external is needed)
     await page.setRequestInterception(true);
     page.on("request", (req) => {
       const url = req.url();
-      const resourceType = req.resourceType();
-
-      // Allow data URIs (our inlined base64 images)
-      if (url.startsWith("data:")) {
-        return req.continue();
-      }
-
-      // Block all external HTTP requests — they cause networkidle0 timeouts
-      if (url.startsWith("http://") || url.startsWith("https://")) {
-        return req.abort();
-      }
-
+      if (url.startsWith("data:")) return req.continue();
+      if (url.startsWith("http://") || url.startsWith("https://")) return req.abort();
       req.continue();
     });
 
-    // Step 3: Set content using domcontentloaded — fast and reliable
-    // We don't need networkidle0 because all images are inlined
     await page.setContent(inlinedHtml, {
       waitUntil: "domcontentloaded",
       timeout: 30000,
     });
 
-    // Small delay to ensure layout is complete (fonts, CSS calculations)
     await new Promise((r) => setTimeout(r, 500));
 
-    // Step 4: Generate PDF
     const buffer = await page.pdf({
       format: "A4",
       printBackground: true,
@@ -311,7 +246,6 @@ async function htmlToPdfBuffer(html, pdfOptions = {}) {
     const duration = Date.now() - start;
     console.log(`[PDF] Generated in ${duration}ms, size: ${bufferObj.length} bytes`);
 
-    // Sanity checks
     if (!bufferObj || bufferObj.length === 0) {
       throw new Error("PDF buffer is empty after generation");
     }
