@@ -113,7 +113,46 @@ async function launchBrowser() {
     console.log("[Browser] Using puppeteer bundled Chrome.");
   }
 
-  return puppeteer.launch(launchOptions);
+  try {
+    return await puppeteer.launch(launchOptions);
+  } catch (err) {
+    if (err.message.includes("Could not find Chrome") || err.message.includes("Could not find expected browser")) {
+      console.log("[Browser] Chrome not found. Auto-installing for cPanel/VPS...");
+      
+      let version = "127.0.6533.88";
+      const match = err.message.match(/ver\. ([\d\.]+)/);
+      if (match && match[1]) version = match[1];
+
+      let cachePath = "";
+      const pathMatch = err.message.match(/which is: (.*?)\)/);
+      if (pathMatch && pathMatch[1]) cachePath = pathMatch[1].trim();
+
+      const { execSync } = require("child_process");
+      const cmd = cachePath 
+        ? `npx @puppeteer/browsers install chrome@${version} --path ${cachePath}` 
+        : `npx @puppeteer/browsers install chrome@${version}`;
+      
+      console.log(`[Browser] Executing: ${cmd}`);
+      const output = execSync(cmd, { encoding: 'utf-8' });
+      console.log(`[Browser] Install Output:\n${output}`);
+
+      const lines = output.split('\n');
+      for (const line of lines) {
+        if (line.trim().startsWith('chrome@')) {
+          const parts = line.trim().split(' ');
+          if (parts.length >= 2) {
+            launchOptions.executablePath = parts[1].trim();
+            console.log(`[Browser] Found installed path: ${launchOptions.executablePath}`);
+            break;
+          }
+        }
+      }
+      
+      console.log("[Browser] Retrying launch after installation...");
+      return await puppeteer.launch(launchOptions);
+    }
+    throw err;
+  }
 }
 
 // ── Image helpers ─────────────────────────────────────────────────────────────
