@@ -1,23 +1,13 @@
-const puppeteer = require("puppeteer");
+const { htmlToPdfBuffer } = require("./launchBrowser");
 const quotationTemplate = require("../templates/quotationTemplate");
 
 const generateQuotationPdf = async (quotation, settings) => {
   const htmlContent = quotationTemplate(quotation, settings);
 
-  const browser = await puppeteer.launch({
-    headless: "new",
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-  });
-
-  const page = await browser.newPage();
-  await page.setContent(htmlContent, { waitUntil: "networkidle0" });
-
-  const pdfBuffer = await page.pdf({
+  const pdfBuffer = await htmlToPdfBuffer(htmlContent, {
     format: "A4",
     printBackground: true,
   });
-
-  await browser.close();
 
   return pdfBuffer;
 };

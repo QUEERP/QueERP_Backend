@@ -5,7 +5,7 @@
  */
 
 const puppeteer = require("puppeteer-core");
-const chromium  = require("@sparticuz/chromium");
+const chromium  = require("@sparticuz/chromium-min");
 const https     = require("https");
 const http      = require("http");
 
@@ -43,8 +43,10 @@ async function getExecPath() {
     }
   }
 
-  // 3. Serverless / Lambda — use @sparticuz/chromium
-  return await chromium.executablePath();
+  // 3. Serverless / Lambda — use @sparticuz/chromium-min with remote tarball
+  return await chromium.executablePath(
+    "https://github.com/Sparticuz/chromium/releases/download/v121.0.0/chromium-v121.0.0-pack.tar"
+  );
 }
 
 /**
