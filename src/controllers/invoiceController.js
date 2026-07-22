@@ -529,9 +529,15 @@ exports.previewInvoice = async (req, res) => {
       where: { id: customerId, businessId: req.business.id },
     });
 
-    const settings = await prisma.settings.findUnique({
+    const business = await prisma.business.findUnique({
+      where: { id: req.business.id },
+    });
+
+    let settings = await prisma.settings.findUnique({
       where: { businessId: req.business.id },
     });
+    if (!settings) settings = {};
+    if (business) settings.businessType = business.businessType;
 
     const mockInvoice = {
       ...rest,

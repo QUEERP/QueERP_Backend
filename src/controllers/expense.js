@@ -15,7 +15,10 @@ exports.createExpense = async (req, res) => {
       date,
       notes,
       vendorId,
-      currency
+      currency,
+      customerId,
+      referenceType,
+      referenceId
     } = req.body;
 
     if (!title || amount === undefined) {
@@ -51,6 +54,9 @@ exports.createExpense = async (req, res) => {
         date: date ? new Date(date) : new Date(),
         notes,
         vendorId,
+        customerId: customerId || null,
+        referenceType: referenceType || null,
+        referenceId: referenceId || null,
         projectId: req.body.projectId || null,
         currency: currency || 'AED',
         items: req.body.items && req.body.items.length > 0 ? {
@@ -103,9 +109,15 @@ exports.createExpense = async (req, res) => {
 //////////////////////////////////////////////////////
 exports.getExpenses = async (req, res) => {
   const businessId = req.business.id;
+  const { referenceId } = req.query;
+
+  const where = { businessId };
+  if (referenceId) {
+    where.referenceId = referenceId;
+  }
 
   const expenses = await prisma.expense.findMany({
-    where: { businessId },
+    where,
     include: { vendor: true, items: true },
     orderBy: { date: "desc" }
   });
@@ -213,4 +225,44 @@ exports.deleteExpense = async (req, res) => {
     success: true,
     message: "Expense deleted"
   });
+};
+
+//////////////////////////////////////////////////////
+// DOWNLOAD EXPENSE PDF
+//////////////////////////////////////////////////////
+exports.downloadExpensePdf = async (req, res) => {
+  try {
+    const businessId = req.business.id;
+    const { id } = req.params;
+
+    const expense = await prisma.expense.findFirst({
+      where: { id, businessId },
+      include: { vendor: true, items: true, customer: true }
+    });
+
+    if (!expense) {
+      return res.status(404).json({ success: false, message: "Expense not found" });
+    }
+
+    const settings = await prisma.settings.findUnique({
+      where: { businessId }
+    });
+
+    const expenseTemplate = require("../templates/expenseTemplate");
+    const { htmlToPdfBuffer } = require("../utils/launchBrowser");
+
+    const html = expenseTemplate(expense, settings || {});
+    const pdfBuffer = await htmlToPdfBuffer(html);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Expense_${expense.id.slice(0, 8)}.pdf"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    
+    return res.end(pdfBuffer);
+  } catch (err) {
+    console.error("downloadExpensePdf error:", err);
+    if (!res.headersSent) {
+      return res.status(500).json({ success: false, message: err.message });
+    }
+  }
 };

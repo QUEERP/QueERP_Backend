@@ -109,6 +109,68 @@ const createPayment = async (businessId, userId, userEmail, invoiceId, data) => 
   });
 };
 
+const createQuotationPayment = async (businessId, userId, userEmail, quotationId, data) => {
+  return await prisma.$transaction(async (tx) => {
+    // 1. Fetch Quotation
+    const quotation = await tx.quotation.findFirst({
+      where: { id: quotationId, businessId, isDeleted: false },
+      include: { payments: true }
+    });
+
+    if (!quotation) {
+      throw new Error("Quotation not found");
+    }
+
+    // 2. Calculate remaining dues
+    const previousPaid = quotation.payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+    const remaining = Math.max(Number(quotation.totalAmount || 0) - previousPaid, 0);
+
+    const paymentAmount = Number(data.amount || 0);
+
+    // 3. Generate unique payment number
+    const paymentNumber = await generateDocNumber(tx, businessId, "PAY", "payment", "paymentNumber");
+
+    // 4. Create Payment Record
+    const payment = await tx.payment.create({
+      data: {
+        paymentNumber,
+        quotationId,
+        businessId,
+        amount: paymentAmount,
+        paymentDate: data.paymentDate ? new Date(data.paymentDate) : new Date(),
+        paymentMode: data.paymentMode || "CASH",
+        transactionId: data.transactionId || null,
+        note: data.note || null,
+        createdBy: userId
+      }
+    });
+
+    // We do not currently change quotation status on payment
+    
+    // 5. Log Audit & Trigger System Alert
+    await logAction(tx, {
+      businessId,
+      userId,
+      userEmail,
+      action: "QUOTATION_PAYMENT_RECORDED",
+      entityType: "Payment",
+      entityId: payment.id,
+      details: { paymentNumber, amount: paymentAmount, quoteNumber: quotation.quoteNumber }
+    });
+
+    await triggerNotification(tx, {
+      businessId,
+      title: "Quotation Payment Recorded",
+      message: `Payment ${paymentNumber} of amount ${paymentAmount} received for quotation ${quotation.quoteNumber}.`,
+      type: "SUCCESS",
+      entityType: "Payment",
+      entityId: payment.id
+    });
+
+    return { payment };
+  });
+};
+
 const getPaymentsByInvoiceId = async (businessId, invoiceId) => {
   return await prisma.payment.findMany({
     where: { invoiceId, businessId },
@@ -116,7 +178,16 @@ const getPaymentsByInvoiceId = async (businessId, invoiceId) => {
   });
 };
 
+const getPaymentsByQuotationId = async (businessId, quotationId) => {
+  return await prisma.payment.findMany({
+    where: { quotationId, businessId },
+    orderBy: { createdAt: "desc" }
+  });
+};
+
 module.exports = {
   createPayment,
-  getPaymentsByInvoiceId
+  createQuotationPayment,
+  getPaymentsByInvoiceId,
+  getPaymentsByQuotationId
 };

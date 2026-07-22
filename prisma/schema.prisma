@@ -37,10 +37,10 @@ model User {
   documentsUploaded      ProjectDocument[]      @relation("DocumentUploader")
   budgetApprovals        ProjectBudgetHistory[] @relation("BudgetHistoryApprover")
 
-  managedExpenses Expense[]       @relation("ExpenseManager")
-  financeExpenses Expense[]       @relation("ExpenseFinance")
-  projectBudgets  ProjectBudget[]
-  ticketComments  TicketComment[]
+  managedExpenses     Expense[]            @relation("ExpenseManager")
+  financeExpenses     Expense[]            @relation("ExpenseFinance")
+  projectBudgets      ProjectBudget[]
+  ticketComments      TicketComment[]
   resourceAllocations ResourceAllocation[]
 
   @@map("users")
@@ -403,6 +403,7 @@ model Customer {
   warranties          Warranty[]
   amcs                AMC[]
   tickets             Ticket[]
+  expenses            Expense[]
 
   @@index([businessId])
   @@index([accountOwnerId])
@@ -648,6 +649,7 @@ model Settings {
 model Payment {
   id            String   @id @default(uuid())
   invoiceId     String?
+  quotationId   String?
   /// ///////////////////////////////////////////////////
   /// ///////////////////////////////////////////////////
   businessId    String
@@ -670,6 +672,7 @@ model Payment {
   business      Business @relation(fields: [businessId], references: [id])
   //   creditNote    CreditNote? @relation(fields: [creditNoteId], references: [id])
   invoice       Invoice? @relation(fields: [invoiceId], references: [id])
+  quotation     Quotation? @relation(fields: [quotationId], references: [id])
 
   @@index([invoiceId])
   @@map("payments")
@@ -848,11 +851,11 @@ model Loan {
 }
 
 model Expense {
-  id            String   @id @default(uuid())
+  id            String        @id @default(uuid())
   businessId    String
   title         String
   amount        Float
-  currency      String?  @default("AED")
+  currency      String?       @default("AED")
   category      String?
   paymentMethod String
   date          DateTime
@@ -881,6 +884,11 @@ model Expense {
   manager   User?        @relation("ExpenseManager", fields: [managerId], references: [id])
   finance   User?        @relation("ExpenseFinance", fields: [financeId], references: [id])
 
+  customerId    String?
+  customer      Customer? @relation(fields: [customerId], references: [id])
+  referenceType String? // 'Quotation' or 'Invoice'
+  referenceId   String? // ID of the quotation or invoice
+
   auditLogs ExpenseAuditLog[]
 }
 
@@ -898,9 +906,9 @@ model ExpenseAuditLog {
 }
 
 model ExpenseItem {
-  id          String   @id @default(uuid())
+  id          String  @id @default(uuid())
   expenseId   String
-  expense     Expense  @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  expense     Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
   itemName    String?
   description String
   quantity    Float?
@@ -910,8 +918,8 @@ model ExpenseItem {
   amount      Float
   category    String?
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Vendor {
@@ -1427,15 +1435,16 @@ model Quotation {
   items       QuotationItem[]
   salesOrders SalesOrder[]
   invoices    Invoice[]
+  payments    Payment[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   projects  Project[]
 
+  @@unique([businessId, quoteNumber])
   @@index([customerId])
   @@index([dealId])
   @@index([isDeleted])
-  @@unique([businessId, quoteNumber])
 }
 
 model QuotationItem {
@@ -1529,10 +1538,10 @@ model SalesOrder {
   updatedAt DateTime  @updatedAt
   projects  Project[]
 
+  @@unique([businessId, orderNumber])
   @@index([customerId])
   @@index([quotationId])
   @@index([isDeleted])
-  @@unique([businessId, orderNumber])
 }
 
 model SalesOrderItem {
@@ -1597,11 +1606,11 @@ model PurchaseOrder {
   //////////////////////////////////////////////////////
   // PRICING
   //////////////////////////////////////////////////////
-  subtotal      Float
-  tax           Float?
-  discount      Float?
-  totalAmount   Float
-  currencyCode  String?  @default("AED")
+  subtotal       Float
+  tax            Float?
+  discount       Float?
+  totalAmount    Float
+  currencyCode   String? @default("AED")
   currencySymbol String? @default("AED")
 
   //////////////////////////////////////////////////////
@@ -1862,24 +1871,24 @@ model Account {
 
   createdAt DateTime @default(now())
 
-  business Business @relation(fields: [businessId], references: [id])
-  entries    JournalEntry[]
+  business Business       @relation(fields: [businessId], references: [id])
+  entries  JournalEntry[]
 }
 
 model JournalEntry {
-  id         String   @id @default(uuid())
-  businessId String
-  accountId  String
-  debit      Float    @default(0)
-  credit     Float    @default(0)
+  id          String   @id @default(uuid())
+  businessId  String
+  accountId   String
+  debit       Float    @default(0)
+  credit      Float    @default(0)
   description String?
-  date       DateTime @default(now())
+  date        DateTime @default(now())
 
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  account    Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  account  Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
 }
 
 // model stock_transfer_items {
@@ -3114,27 +3123,27 @@ model ProjectMaster {
 }
 
 model ProjectRequirement {
-  id                 String   @id @default(uuid())
-  businessId         String
-  requirementNumber  String   @unique
-  title              String
-  customerId         String
-  contactId          String?
-  businessType       String?
-  department         String?
-  industry           String?
-  priority           String?
-  
+  id                String  @id @default(uuid())
+  businessId        String
+  requirementNumber String  @unique
+  title             String
+  customerId        String
+  contactId         String?
+  businessType      String?
+  department        String?
+  industry          String?
+  priority          String?
+
   // Project Economics
-  projectSize        String?
-  expectedBudget     Float?
-  estimatedCost      Float?
-  expectedRevenue    Float?
-  expectedProfit     Float?
-  expectedMargin     Float?
-  budgetRange        String?
-  billingModel       String?
-  paymentTerms       String?
+  projectSize     String?
+  expectedBudget  Float?
+  estimatedCost   Float?
+  expectedRevenue Float?
+  expectedProfit  Float?
+  expectedMargin  Float?
+  budgetRange     String?
+  billingModel    String?
+  paymentTerms    String?
 
   assignedEmployeeId String?
   description        String?  @db.Text
@@ -3148,11 +3157,11 @@ model ProjectRequirement {
   currency      String?
   country       String?
   timezone      String?
-  
+
   // Customer Contact Addition
   website                String?
   preferredCommunication String?
-  
+
   // Business Requirements (BRS)
   businessObjective       String? @db.Text
   currentProblem          String? @db.Text
@@ -3171,23 +3180,23 @@ model ProjectRequirement {
   brsDependencies         String? @db.Text
 
   // Technical / Operational Requirements
-  technologyStack          String? @db.Text
-  thirdPartyIntegrations   String? @db.Text
-  apiDataRequirements      String? @db.Text
-  securityCompliance       String? @db.Text
-  hostingPreference        String?
-  performanceRequirement   String? @db.Text
+  technologyStack            String? @db.Text
+  thirdPartyIntegrations     String? @db.Text
+  apiDataRequirements        String? @db.Text
+  securityCompliance         String? @db.Text
+  hostingPreference          String?
+  performanceRequirement     String? @db.Text
   infrastructureRequirements String? @db.Text
-  hardwareRequirements     String? @db.Text
-  networkRequirements      String? @db.Text
-  authentication           String? @db.Text
-  authorization            String? @db.Text
-  database                 String?
-  browserSupport           String?
-  mobileSupport            String?
-  backupStrategy           String? @db.Text
-  disasterRecovery         String? @db.Text
-  complianceRequirements   String? @db.Text
+  hardwareRequirements       String? @db.Text
+  networkRequirements        String? @db.Text
+  authentication             String? @db.Text
+  authorization              String? @db.Text
+  database                   String?
+  browserSupport             String?
+  mobileSupport              String?
+  backupStrategy             String? @db.Text
+  disasterRecovery           String? @db.Text
+  complianceRequirements     String? @db.Text
 
   // Timeline & Schedule
   requirementDate   DateTime?
@@ -3218,16 +3227,16 @@ model ProjectRequirement {
   implementationNotes      String? @db.Text
   supportNotes             String? @db.Text
 
-  deliverables  Json?
-  team          Json?
-  attachments   Json?
-  
-  contactPerson String?
-  email         String?
-  phone         String?
-  company       String?
+  deliverables Json?
+  team         Json?
+  attachments  Json?
+
+  contactPerson        String?
+  email                String?
+  phone                String?
+  company              String?
   completionPercentage Float?
-  createdBy     String? 
+  createdBy            String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -3339,23 +3348,23 @@ model Project {
   salesOrder     SalesOrder?      @relation(fields: [salesOrderId], references: [id])
   template       ProjectTemplate? @relation(fields: [templateId], references: [id])
 
-  milestones       ProjectMilestone[]
-  tasks            ProjectTask[]
-  timeEntries      TimeEntry[]
-  invoices         Invoice[]
-  expenses         Expense[]
-  purchaseOrders   PurchaseOrder[]
-  purchaseRequests PurchaseRequest[]
-  issues           ProjectIssue[]
-  changeRequests   ProjectChangeRequest[]
-  risks            ProjectRisk[]
-  documents        ProjectDocument[]
-  meetings         ProjectMeeting[]
-  projectBudget    ProjectBudget?
-  warranties       Warranty[]
-  amcs             AMC[]
-  tickets          Ticket[]
-  plannings        ProjectPlanning[]
+  milestones          ProjectMilestone[]
+  tasks               ProjectTask[]
+  timeEntries         TimeEntry[]
+  invoices            Invoice[]
+  expenses            Expense[]
+  purchaseOrders      PurchaseOrder[]
+  purchaseRequests    PurchaseRequest[]
+  issues              ProjectIssue[]
+  changeRequests      ProjectChangeRequest[]
+  risks               ProjectRisk[]
+  documents           ProjectDocument[]
+  meetings            ProjectMeeting[]
+  projectBudget       ProjectBudget?
+  warranties          Warranty[]
+  amcs                AMC[]
+  tickets             Ticket[]
+  plannings           ProjectPlanning[]
   resourceAllocations ResourceAllocation[]
 }
 
@@ -3403,12 +3412,12 @@ model ProjectTask {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  business    Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  project     Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  milestone   ProjectMilestone? @relation(fields: [milestoneId], references: [id])
-  assignedTo  User?             @relation("TaskAssignedTo", fields: [assignedToId], references: [id])
-  timeEntries TimeEntry[]
-  expenses    Expense[]
+  business            Business             @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  project             Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  milestone           ProjectMilestone?    @relation(fields: [milestoneId], references: [id])
+  assignedTo          User?                @relation("TaskAssignedTo", fields: [assignedToId], references: [id])
+  timeEntries         TimeEntry[]
+  expenses            Expense[]
   resourceAllocations ResourceAllocation[]
 }
 
@@ -3421,30 +3430,30 @@ model ProjectPlanning {
   businessId String
   projectId  String
 
-  planCode   String  @unique
-  planName   String
-  phase      String?
-  sprint     String?
-  execType   String?
-  status     String  @default("DRAFT")
-  priority   String?
+  planCode    String  @unique
+  planName    String
+  phase       String?
+  sprint      String?
+  execType    String?
+  status      String  @default("DRAFT")
+  priority    String?
   description String? @db.Text
 
-  startDate           DateTime?
-  endDate             DateTime?
-  expectedCompletion  DateTime?
-  duration            Int?
-  workingDays         Int?
-  milestone           String?
-  dependency          String?
+  startDate          DateTime?
+  endDate            DateTime?
+  expectedCompletion DateTime?
+  duration           Int?
+  workingDays        Int?
+  milestone          String?
+  dependency         String?
 
-  projectManagerId    String?
-  department          String?
-  taskOwnerId         String?
-  resources           Int?
-  estimatedHours      Float @default(0)
-  billableHours       Float @default(0)
-  resourceCost        Float @default(0)
+  projectManagerId String?
+  department       String?
+  taskOwnerId      String?
+  resources        Int?
+  estimatedHours   Float   @default(0)
+  billableHours    Float   @default(0)
+  resourceCost     Float   @default(0)
 
   taskTitle    String?
   subTask      String?
@@ -3453,9 +3462,9 @@ model ProjectPlanning {
   recurring    Boolean @default(false)
   reminder     Int?
 
-  initialProgress      Float @default(0)
-  currentProgress      Float @default(0)
-  completionPercentage Float @default(0)
+  initialProgress      Float   @default(0)
+  currentProgress      Float   @default(0)
+  completionPercentage Float   @default(0)
   progressStatus       String?
   riskLevel            String?
 
@@ -3853,7 +3862,7 @@ model TicketAttachment {
 }
 
 model ResourceAllocation {
-  id                String   @id @default(uuid())
+  id                String    @id @default(uuid())
   businessId        String
   projectId         String
   taskId            String?
@@ -3862,17 +3871,17 @@ model ResourceAllocation {
   role              String?
   startDate         DateTime?
   endDate           DateTime?
-  estimatedHours    Float    @default(0)
-  allocationPercent Float    @default(100)
+  estimatedHours    Float     @default(0)
+  allocationPercent Float     @default(100)
   priority          String?
-  notes             String?  @db.Text
-  status            String   @default("Active")
-  
+  notes             String?   @db.Text
+  status            String    @default("Active")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  project  Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  business Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  project  Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
   task     ProjectTask? @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  employee User     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employee User         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 }

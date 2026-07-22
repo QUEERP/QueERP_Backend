@@ -68,4 +68,16 @@ router.delete(
   expenseController.deleteExpense
 );
 
+//////////////////////////////////////////////////////
+// DOWNLOAD EXPENSE PDF
+//////////////////////////////////////////////////////
+router.get(
+  "/:id/pdf",
+  authMiddleware,
+  businessMiddleware,
+  checkBusinessSubscription,
+  checkPermission("Expense", "view"),
+  expenseController.downloadExpensePdf
+);
+
 module.exports = router;

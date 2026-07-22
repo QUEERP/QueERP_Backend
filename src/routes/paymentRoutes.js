@@ -27,6 +27,17 @@ router.post(
 );
 
 //////////////////////////////////////////////////
+// 🔥 CREATE PAYMENT (QUOTATION)
+//////////////////////////////////////////////////
+router.post(
+  "/quotation/:quotationId",
+  auth,
+  business,
+  checkPermission("payment", "create"),
+  controller.createPayment
+);
+
+//////////////////////////////////////////////////
 // GET ALL PAYMENTS
 //////////////////////////////////////////////////
 router.get(
@@ -46,6 +57,17 @@ router.get(
   business,
   checkPermission("payment", "read"),
   controller.getInvoicePayments
+);
+
+//////////////////////////////////////////////////
+// READ PAYMENTS BY QUOTATION
+//////////////////////////////////////////////////
+router.get(
+  "/quotation/:quotationId",
+  auth,
+  business,
+  checkPermission("payment", "read"),
+  controller.getQuotationPayments
 );
 
 

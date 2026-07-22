@@ -5,9 +5,8 @@
  */
 
 const puppeteer = require("puppeteer-core");
-const chromium  = require("@sparticuz/chromium");
-const https     = require("https");
-const http      = require("http");
+const https = require("https");
+const http = require("http");
 
 const CHROME_ARGS = [
   "--no-sandbox",
@@ -43,8 +42,14 @@ async function getExecPath() {
     }
   }
 
-  // 3. Serverless / Lambda — use @sparticuz/chromium
-  return await chromium.executablePath();
+  // 3. Serverless / Lambda — use @sparticuz/chromium-min with remote tarball
+  // NOTE: @sparticuz/chromium-min is an ES Module, so it MUST be loaded via
+  // dynamic import() here, not require() at the top of the file. require()-ing
+  // it at module load time crashes the entire server on boot (ERR_REQUIRE_ESM).
+  const { default: chromium } = await import("@sparticuz/chromium-min");
+  return await chromium.executablePath(
+    "https://github.com/Sparticuz/chromium/releases/download/v121.0.0/chromium-v121.0.0-pack.tar"
+  );
 }
 
 /**

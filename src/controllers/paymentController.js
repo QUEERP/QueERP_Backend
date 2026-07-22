@@ -19,7 +19,7 @@ exports.createPayment = async (req, res) => {
     const userId = req.user.userId || req.user.id;
     const userEmail = req.user.email;
 
-    const { invoiceId, billId } = req.params;
+    const { invoiceId, billId, quotationId } = req.params;
 
     //////////////////////////////////////////////////////
     // 🔥 BILL PAYMENT (PRESERVED LOGIC)
@@ -187,7 +187,22 @@ exports.createPayment = async (req, res) => {
       );
     }
 
-    return errorResponse(res, "Missing invoiceId or billId parameter", 400);
+    //////////////////////////////////////////////////////
+    // 🔥 QUOTATION PAYMENT
+    //////////////////////////////////////////////////////
+    if (quotationId) {
+      const validatedData = createPaymentSchema.parse(req.body);
+
+      const result = await paymentService.createQuotationPayment(businessId, userId, userEmail, quotationId, validatedData);
+
+      return successResponse(
+        res,
+        result,
+        "Quotation payment recorded successfully"
+      );
+    }
+
+    return errorResponse(res, "Missing invoiceId, billId, or quotationId parameter", 400);
 
   } catch (error) {
     console.error("createPayment controller error:", error);
@@ -211,6 +226,23 @@ exports.getInvoicePayments = async (req, res) => {
     return successResponse(res, payments, "Invoice payments retrieved successfully");
   } catch (err) {
     console.error("getInvoicePayments controller error:", err);
+    return errorResponse(res, err.message, 500);
+  }
+};
+
+//////////////////////////////////////////////////////
+// GET PAYMENTS BY QUOTATION
+//////////////////////////////////////////////////////
+exports.getQuotationPayments = async (req, res) => {
+  try {
+    const businessId = req.business.id;
+    const { quotationId } = req.params;
+
+    const payments = await paymentService.getPaymentsByQuotationId(businessId, quotationId);
+
+    return successResponse(res, payments, "Quotation payments retrieved successfully");
+  } catch (err) {
+    console.error("getQuotationPayments controller error:", err);
     return errorResponse(res, err.message, 500);
   }
 };
