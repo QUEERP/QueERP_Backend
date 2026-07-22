@@ -649,6 +649,7 @@ model Settings {
 model Payment {
   id            String   @id @default(uuid())
   invoiceId     String?
+  quotationId   String?
   /// ///////////////////////////////////////////////////
   /// ///////////////////////////////////////////////////
   businessId    String
@@ -671,6 +672,7 @@ model Payment {
   business      Business @relation(fields: [businessId], references: [id])
   //   creditNote    CreditNote? @relation(fields: [creditNoteId], references: [id])
   invoice       Invoice? @relation(fields: [invoiceId], references: [id])
+  quotation     Quotation? @relation(fields: [quotationId], references: [id])
 
   @@index([invoiceId])
   @@map("payments")
@@ -1433,6 +1435,7 @@ model Quotation {
   items       QuotationItem[]
   salesOrders SalesOrder[]
   invoices    Invoice[]
+  payments    Payment[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
