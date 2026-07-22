@@ -1,12 +1,21 @@
-const puppeteer = require("puppeteer");
+const puppeteer = require("puppeteer-core");
+const chromium = require("@sparticuz/chromium");
 const quotationTemplate = require("../templates/quotationTemplate");
 
 const generateQuotationPdf = async (quotation, settings) => {
   const htmlContent = quotationTemplate(quotation, settings);
 
+  const execPath = process.env.NODE_ENV !== "production"
+    ? (process.platform === "win32"
+        ? "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+        : "/usr/bin/google-chrome")
+    : await chromium.executablePath();
+
   const browser = await puppeteer.launch({
-    headless: "new",
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    executablePath: execPath,
+    args: chromium.args,
+    headless: chromium.headless,
+    defaultViewport: chromium.defaultViewport,
   });
 
   const page = await browser.newPage();
