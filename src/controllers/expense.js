@@ -109,9 +109,15 @@ exports.createExpense = async (req, res) => {
 //////////////////////////////////////////////////////
 exports.getExpenses = async (req, res) => {
   const businessId = req.business.id;
+  const { referenceId } = req.query;
+
+  const where = { businessId };
+  if (referenceId) {
+    where.referenceId = referenceId;
+  }
 
   const expenses = await prisma.expense.findMany({
-    where: { businessId },
+    where,
     include: { vendor: true, items: true },
     orderBy: { date: "desc" }
   });
