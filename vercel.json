@@ -1,12 +1,12 @@
 {
   "functions": {
     "server.js": {
-      "memory": 1024,
-      "maxDuration": 15
+      "memory": 3008,
+      "maxDuration": 60
     },
     "src/**/*.js": {
-      "memory": 1024,
-      "maxDuration": 15
+      "memory": 3008,
+      "maxDuration": 60
     }
   }
 }
