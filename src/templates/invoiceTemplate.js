@@ -48,7 +48,9 @@ module.exports = (invoice, settings = {}) => {
     });
   });
 
-  const taxBreakdownHtml = `
+  const hasTax = Number(invoice.totalTax || 0) > 0;
+
+  const taxBreakdownHtml = hasTax ? `
     <div style="background:#f8f9fa; border:1px solid #eee; padding:10px; font-size: 9px;">
       <div style="font-weight:bold; border-bottom:1px solid #ddd; padding-bottom:5px; margin-bottom:10px; text-transform:uppercase;">Tax Breakdown</div>
       ${Object.entries(taxSummary).map(([name, amt]) => `
@@ -62,7 +64,7 @@ module.exports = (invoice, settings = {}) => {
         </div>
       `).join('')}
     </div>
-  `;
+  ` : '';
 
   const bankDetailsHtml = `
     <div style="background:#f8f9fa; border:1px solid #eee; padding:12px; margin-top:15px; width: 100%;">
@@ -140,7 +142,7 @@ module.exports = (invoice, settings = {}) => {
          <div style="margin-top:3px; font-size:10px; line-height:1.4; color:#444;">
            ${settings.address || ''}<br/>
            ${settings.phone ? settings.phone : ''}<br/>
-           TRN: ${settings.trn || ''}
+           Tax ID / TRN: ${settings.trn || ''}
          </div>
        </div>
        <div style="text-align: right;">
@@ -209,7 +211,7 @@ module.exports = (invoice, settings = {}) => {
           <tr><td>Subtotal</td><td style="text-align:right;">${sym} ${fmt(invoice.subtotal)}</td></tr>
           ${invoice.discount ? `<tr><td>Discount</td><td style="text-align:right;">- ${sym} ${fmt(invoice.discount)}</td></tr>` : ''}
           ${invoice.shippingCharges ? `<tr><td>Shipping</td><td style="text-align:right;">+ ${sym} ${fmt(invoice.shippingCharges)}</td></tr>` : ''}
-          <tr><td>Tax</td><td style="text-align:right;">${sym} ${fmt(invoice.totalTax)}</td></tr>
+          ${hasTax ? `<tr><td>Tax</td><td style="text-align:right;">${sym} ${fmt(invoice.totalTax)}</td></tr>` : ''}
           ${invoice.tds ? `<tr><td>TDS</td><td style="text-align:right;">- ${sym} ${fmt(invoice.tds)}</td></tr>` : ''}
           <tr class="total-row">
             <td>Total Amount Due</td><td style="text-align:right;">${sym} ${fmt(invoice.grandTotal)}</td>
@@ -300,7 +302,7 @@ module.exports = (invoice, settings = {}) => {
       <div style="margin-top:3px; font-size:10px; line-height:1.4; opacity: 0.9;">
         ${settings.address || ''}<br/>
         ${settings.phone ? settings.phone : ''}<br/>
-        TRN: ${settings.trn || ''}
+        Tax ID / TRN: ${settings.trn || ''}
       </div>
     </div>
     <div style="text-align: right;">
@@ -379,7 +381,7 @@ module.exports = (invoice, settings = {}) => {
                <tr><td>Subtotal :</td><td style="text-align:right; padding-left: 20px;">${sym} ${fmt(invoice.subtotal)}</td></tr>
                ${invoice.discount ? `<tr><td>Discount :</td><td style="text-align:right;">- ${sym} ${fmt(invoice.discount)}</td></tr>` : ''}
                ${invoice.shippingCharges ? `<tr><td>Shipping :</td><td style="text-align:right;">+ ${sym} ${fmt(invoice.shippingCharges)}</td></tr>` : ''}
-               <tr><td>Tax :</td><td style="text-align:right;">${sym} ${fmt(invoice.totalTax)}</td></tr>
+               ${hasTax ? `<tr><td>Tax :</td><td style="text-align:right;">${sym} ${fmt(invoice.totalTax)}</td></tr>` : ''}
                ${invoice.tds ? `<tr><td>TDS :</td><td style="text-align:right;">- ${sym} ${fmt(invoice.tds)}</td></tr>` : ''}
              </table>
              <div class="total-box">
@@ -465,7 +467,7 @@ module.exports = (invoice, settings = {}) => {
         <div style="color:#444; margin-top:3px; font-size:10px; line-height:1.4;">
           ${settings.address || ''}<br/>
           ${settings.phone ? settings.phone : ''}<br/>
-          TRN: ${settings.trn || ''}
+          Tax ID / TRN: ${settings.trn || ''}
         </div>
       </div>
       <div class="text-right">
@@ -487,7 +489,7 @@ module.exports = (invoice, settings = {}) => {
       ${invoice.ewayBillNo ? `<div class="info-box"><label>E-Way Bill</label>${invoice.ewayBillNo}</div>` : `<div class="info-box"></div>`}
       ${invoice.transportDetails ? `<div class="info-box"><label>Transport</label>${invoice.transportDetails}</div>` : `<div class="info-box"></div>`}
       ${invoice.reverseCharge ? `<div class="info-box"><label>Reverse Charge</label>Yes</div>` : `<div class="info-box"></div>`}
-      ${invoice.vatType ? `<div class="info-box"><label>VAT Type</label>${invoice.vatType === 'inclusive' ? 'Inclusive' : 'Exclusive'}</div>` : `<div class="info-box"></div>`}
+      ${invoice.vatType ? `<div class="info-box"><label>Tax Type</label>${invoice.vatType === 'inclusive' ? 'Inclusive' : 'Exclusive'}</div>` : `<div class="info-box"></div>`}
       ${invoice.emirate ? `<div class="info-box"><label>Emirate</label>${invoice.emirate}</div>` : `<div class="info-box"></div>`}
     </div>
     ` : ''}
@@ -500,7 +502,7 @@ module.exports = (invoice, settings = {}) => {
           <div style="margin-top:5px; line-height:1.4; color:#444;">
             ${invoice.customer?.billingStreet || invoice.customer?.address || ''}<br/>
             ${invoice.customer?.billingCity || ''}, ${invoice.customer?.billingCountry || ''}<br/>
-            TRN: ${invoice.customer?.vatNumber || '-'}
+            Tax ID / TRN: ${invoice.customer?.vatNumber || '-'}
           </div>
         </div>
       </div>
@@ -511,7 +513,7 @@ module.exports = (invoice, settings = {}) => {
           <div style="margin-top:5px; line-height:1.4; color:#444;">
             ${invoice.customer?.shippingStreet || invoice.customer?.billingStreet || ''}<br/>
             ${invoice.customer?.shippingCity || ''}, ${invoice.customer?.billingCountry || ''}<br/>
-            TRN: ${invoice.customer?.vatNumber || '-'}
+            Tax ID / TRN: ${invoice.customer?.vatNumber || '-'}
           </div>
         </div>
       </div>
@@ -566,7 +568,7 @@ module.exports = (invoice, settings = {}) => {
           <tr><td>Subtotal</td><td class="text-right">${sym} ${fmt(invoice.subtotal)}</td></tr>
           ${invoice.discount ? `<tr><td>Discount</td><td class="text-right">- ${sym} ${fmt(invoice.discount)}</td></tr>` : ''}
           ${invoice.shippingCharges ? `<tr><td>Shipping</td><td class="text-right">+ ${sym} ${fmt(invoice.shippingCharges)}</td></tr>` : ''}
-          <tr><td>Total Tax</td><td class="text-right">${sym} ${fmt(invoice.totalTax)}</td></tr>
+          ${hasTax ? `<tr><td>Total Tax</td><td class="text-right">${sym} ${fmt(invoice.totalTax)}</td></tr>` : ''}
           ${invoice.tds ? `<tr><td>TDS</td><td class="text-right">- ${sym} ${fmt(invoice.tds)}</td></tr>` : ''}
           <tr class="total-row" style="background:#1f4e79; color:#fff; font-weight:bold;">
             <td style="padding:10px;">Total</td>

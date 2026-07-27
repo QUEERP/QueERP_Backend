@@ -109,6 +109,7 @@ exports.createInvoice = async (req, res) => {
         invoiceItems.push({
           productId: item.productId,
           warehouseId: item.warehouseId || null,
+          itemName: item.itemName || item.name || item.description?.substring(0, 50),
           description: item.description,
           hsnSacCode: item.hsnSacCode || item.taxCode || null,
           itemType: item.itemType || 'GOODS',
@@ -411,6 +412,7 @@ exports.updateInvoice = async (req, res) => {
         invoiceId,
         productId: i.productId || null,
         warehouseId: i.warehouseId || null,
+        itemName: i.itemName || i.name || i.description?.substring(0, 50),
         description: i.description,
         hsnSacCode: i.hsnSacCode || i.taxCode || null,
         itemType: isService ? 'SERVICE' : 'GOODS',

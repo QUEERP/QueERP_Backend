@@ -293,6 +293,9 @@ exports.getPayments = async (req, res) => {
           select: {
             id: true,
             invoiceNumber: true,
+            currency: true,
+            projectId: true,
+            project: { select: { id: true, projectName: true, projectCode: true } }
           },
         },
         bill: {
@@ -305,6 +308,20 @@ exports.getPayments = async (req, res) => {
               },
             },
           },
+        },
+        quotation: {
+          select: {
+            id: true,
+            quoteNumber: true,
+            currency: true,
+            projects: {
+              select: {
+                id: true,
+                projectName: true,
+                projectCode: true
+              }
+            }
+          }
         },
       },
       orderBy: { createdAt: "desc" },
@@ -338,11 +355,56 @@ exports.downloadPaymentPdf = async (req, res) => {
     // Since Cloudinary is blocking PDF delivery (401), dynamically generate the PDF and send it
     const generatePaymentPdfHelper = require("../utils/generatePaymentPdf");
     
-    // Fetch associated invoice and settings for the template
-    const invoice = await prisma.invoice.findUnique({
-      where: { id: payment.invoiceId },
-      include: { customer: true, payments: true }
-    });
+    let invoice = null;
+    if (payment.invoiceId) {
+      invoice = await prisma.invoice.findUnique({
+        where: { id: payment.invoiceId },
+        include: { customer: true, payments: true }
+      });
+    } else if (payment.quotationId) {
+      const quotation = await prisma.quotation.findUnique({
+        where: { id: payment.quotationId },
+        include: { customer: true, payments: true }
+      });
+      if (quotation) {
+        invoice = {
+          invoiceNumber: quotation.quoteNumber,
+          invoiceDate: quotation.issueDate,
+          grandTotal: quotation.totalAmount,
+          customer: quotation.customer,
+          payments: quotation.payments
+        };
+      }
+    } else if (payment.billId) {
+      const bill = await prisma.bill.findUnique({
+        where: { id: payment.billId },
+        include: { vendor: true, payments: true }
+      });
+      if (bill) {
+        invoice = {
+          invoiceNumber: bill.billNumber,
+          invoiceDate: bill.billDate,
+          grandTotal: bill.totalAmount,
+          customer: {
+            company: bill.vendor?.name,
+            billingStreet: bill.vendor?.billingAddress,
+            billingCity: '',
+            vatNumber: bill.vendor?.taxId
+          },
+          payments: bill.payments
+        };
+      }
+    }
+    
+    if (!invoice) {
+      invoice = {
+        invoiceNumber: '-',
+        invoiceDate: payment.paymentDate,
+        grandTotal: payment.amount,
+        customer: {},
+        payments: []
+      };
+    }
     
     const settings = await prisma.settings.findUnique({
       where: { businessId: req.business.id }

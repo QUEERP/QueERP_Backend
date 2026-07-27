@@ -254,6 +254,8 @@ const getQuotationById = async (businessId, quotationId) => {
       customer: true,
       contact: true,
       deal: true,
+      payments: true,
+      projects: true,
       assignedTo: {
         select: {
           id: true,
