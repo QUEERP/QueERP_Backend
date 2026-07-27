@@ -92,6 +92,10 @@ exports.getMyData = async (req, res) => {
           include: { customer: true },
           orderBy: { createdAt: "desc" },
         },
+        quotations: {
+          include: { customer: true },
+          orderBy: { createdAt: "desc" },
+        },
 
         //////////////////////////////////////////////////////
         // USERS + PERMISSIONS
@@ -159,6 +163,10 @@ exports.getMyData = async (req, res) => {
             customers: true,
 
             invoices: {
+              include: { customer: true },
+              orderBy: { createdAt: "desc" },
+            },
+            quotations: {
               include: { customer: true },
               orderBy: { createdAt: "desc" },
             },

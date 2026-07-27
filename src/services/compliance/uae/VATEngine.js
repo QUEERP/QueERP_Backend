@@ -17,7 +17,7 @@ class UaeVATEngine {
     }
 
     // 2. Domestic VAT Rules
-    const uaeVatRate = Number(taxPercent || 5);
+    const uaeVatRate = (taxPercent !== undefined && taxPercent !== null && taxPercent !== '') ? Number(taxPercent) : 5;
     let vatAmount = 0;
     let effectiveSubtotal = baseSubtotal;
 
