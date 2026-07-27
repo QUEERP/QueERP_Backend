@@ -22,6 +22,7 @@ async function urlToBase64(url) {
 
   return new Promise((resolve) => {
     try {
+
       const proto = url.startsWith("https") ? https : http;
       const req = proto.get(url, { timeout: 8000 }, (res) => {
         if (res.statusCode !== 200) {
