@@ -113,15 +113,13 @@ async function launchBrowser() {
   console.log("process.env.VERCEL:", process.env.VERCEL);
 
   const isLocal = process.platform === "win32" || process.env.NODE_ENV === "development";
-  
-  let executablePath;
-  
+  let executablePath, args, headless;
+
   if (isLocal) {
-    // 1. Explicit override for local dev
+    // ——— Local (Windows / Linux dev) ———
     if (process.env.PUPPETEER_EXECUTABLE_PATH) {
       executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
     } else if (process.platform === "win32") {
-      // 2. Windows default paths
       const fs = require("fs");
       const winPaths = [
         "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
@@ -134,30 +132,43 @@ async function launchBrowser() {
         }
       }
     }
+    args = puppeteer.defaultArgs();
+    headless = true;
   } else {
-    // 3. Vercel Serverless / AWS Lambda
+    // ——— Vercel / AWS Lambda ———
     try {
       executablePath = await chromium.executablePath();
-      console.log("chromium.executablePath() succeeded.");
     } catch (err) {
       console.error("[STEP 5 FAILED] chromium.executablePath() error:", err);
-      console.error(err.stack);
       throw err;
     }
+
+    // Start with chromium's recommended args, then add GPU‑disabling flags
+    const defaultArgs = chromium.args;
+    args = [
+      ...defaultArgs,
+      '--disable-gpu',
+      '--disable-software-rasterizer',
+    ];
+    if (!args.includes('--no-sandbox')) {
+      args.push('--no-sandbox');
+    }
+
+    // Use old headless mode to avoid GPU process
+    headless = 'old';  // or `true` (old headless)
   }
 
   console.log("[STEP 5] Chromium executable path:", executablePath || 'default');
-  
   if (!isLocal) {
-    console.log("chromium.args:", chromium.args);
-    console.log("chromium.headless:", chromium.headless);
+    console.log("Final args:", args);
+    console.log("Headless mode:", headless);
   }
 
   try {
     const browser = await puppeteer.launch({
-      executablePath: executablePath,
-      headless: isLocal ? true : chromium.headless,
-      args: isLocal ? puppeteer.defaultArgs() : chromium.args,
+      executablePath,
+      headless,
+      args,
       defaultViewport: chromium.defaultViewport,
       timeout: 60000,
     });
@@ -165,24 +176,19 @@ async function launchBrowser() {
     return browser;
   } catch (err) {
     console.error(`[TIME: ${Date.now()}] [STEP 6 FAILED] Took ${Date.now() - launchStart}ms. Error:`, err);
-    console.error(err.stack);
-    
-    // Additional filesystem debug if Vercel
+    // Filesystem diagnostics (optional)
     if (!isLocal && executablePath) {
-       const fs = require('fs');
-       if (!fs.existsSync(executablePath)) {
-         console.error(`FATAL: Executable does not exist at ${executablePath}`);
-       } else {
-         console.log(`Executable exists at ${executablePath}`);
-         const stats = fs.statSync(executablePath);
-         console.log(`Executable size: ${stats.size} bytes`);
-         console.log(`Executable permissions: ${stats.mode.toString(8)}`);
-       }
+      const fs = require('fs');
+      if (!fs.existsSync(executablePath)) {
+        console.error(`FATAL: Executable does not exist at ${executablePath}`);
+      } else {
+        const stats = fs.statSync(executablePath);
+        console.log(`Executable size: ${stats.size} bytes, permissions: ${stats.mode.toString(8)}`);
+      }
     }
     throw err;
   }
 }
-
 /**
  * Generate a PDF Buffer from an HTML string.
  * @param {string} html - HTML content to render
@@ -209,7 +215,7 @@ async function htmlToPdfBuffer(html, pdfOptions = {}) {
     console.log(`[TIME: ${Date.now()}] [STEP 1.2] inlineExternalImages took ${Date.now() - inlineStart}ms`);
 
     browser = await launchBrowser();
-    
+
     let page;
     try {
       const newPageStart = Date.now();
@@ -230,10 +236,10 @@ async function htmlToPdfBuffer(html, pdfOptions = {}) {
         activeRequests--;
         console.log(`[NETWORK] Request failed: ${req.url()} - ${req.failure()?.errorText}`);
       });
-      
+
       // We log active requests right before timeouts
       page.on('error', err => console.log('[PAGE ERROR]', err));
-      
+
     } catch (err) {
       console.error(`[TIME: ${Date.now()}] [STEP 7 FAILED] browser.newPage() error:`, err);
       throw err;
@@ -249,12 +255,12 @@ async function htmlToPdfBuffer(html, pdfOptions = {}) {
         timeout: 45000,
       });
       console.log(`[TIME: ${Date.now()}] [STEP 8] page.setContent() completed. Took ${Date.now() - contentStart}ms`);
-      
+
       // Manually wait for fonts
       const fontStart = Date.now();
-      await page.evaluateHandle('document.fonts.ready').catch(() => {});
+      await page.evaluateHandle('document.fonts.ready').catch(() => { });
       console.log(`[TIME: ${Date.now()}] [STEP 8.1] Document fonts ready. Took ${Date.now() - fontStart}ms`);
-      
+
     } catch (err) {
       console.error(`[TIME: ${Date.now()}] [STEP 8 FAILED] page.setContent() error:`, err);
       throw err;
