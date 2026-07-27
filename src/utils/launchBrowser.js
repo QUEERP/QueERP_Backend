@@ -106,20 +106,11 @@ async function inlineExternalImages(html) {
  * @returns {Promise<import('puppeteer-core').Browser>}
  */
 async function launchBrowser() {
-  console.log("[STEP 4] Starting browser launch");
+  const launchStart = Date.now();
+  console.log(`[TIME: ${launchStart}] [STEP 4] Starting browser launch`);
   console.log("--- ENVIRONMENT DIAGNOSTICS ---");
   console.log("process.platform:", process.platform);
-  console.log("process.version:", process.version);
   console.log("process.env.VERCEL:", process.env.VERCEL);
-  console.log("process.env.NODE_ENV:", process.env.NODE_ENV);
-  try {
-    const pkg = require("../../package.json");
-    console.log("puppeteer-core version:", pkg.dependencies["puppeteer-core"]);
-    console.log("@sparticuz/chromium version:", pkg.dependencies["@sparticuz/chromium"]);
-  } catch (e) {
-    console.log("Could not read package.json version", e.message);
-  }
-  console.log("-------------------------------");
 
   const isLocal = process.platform === "win32" || process.env.NODE_ENV === "development";
   
@@ -170,10 +161,10 @@ async function launchBrowser() {
       defaultViewport: chromium.defaultViewport,
       timeout: 60000,
     });
-    console.log("[STEP 6] Browser launched successfully");
+    console.log(`[TIME: ${Date.now()}] [STEP 6] Browser launched successfully. Took ${Date.now() - launchStart}ms`);
     return browser;
   } catch (err) {
-    console.error("[STEP 6 FAILED] Failed to launch browser process:", err);
+    console.error(`[TIME: ${Date.now()}] [STEP 6 FAILED] Took ${Date.now() - launchStart}ms. Error:`, err);
     console.error(err.stack);
     
     // Additional filesystem debug if Vercel
@@ -199,50 +190,90 @@ async function launchBrowser() {
  * @returns {Promise<Buffer>}
  */
 async function htmlToPdfBuffer(html, pdfOptions = {}) {
-  console.log("[STEP 2] HTML generated successfully");
-  console.log(`[STEP 3] HTML size: ${html.length} characters`);
-  const start = Date.now();
+  const globalStart = Date.now();
+  console.log(`[TIME: ${globalStart}] [STEP 1] HTML generated`);
+  console.log(`[STEP 1.1] HTML size: ${(html.length / 1024).toFixed(2)} KB`);
+
+  // Simple counters for diagnostic logs
+  const imgCount = (html.match(/<img/g) || []).length;
+  const extImgCount = (html.match(/src=["'](https?:\/\/[^"']+)["']/g) || []).length;
+  const fontCount = (html.match(/@font-face/g) || []).length;
+  const extCssCount = (html.match(/<link[^>]+rel=["']stylesheet["']/g) || []).length;
+  console.log(`[DIAGNOSTICS] Images: ${imgCount} (External: ${extImgCount}), Fonts: ${fontCount}, CSS files: ${extCssCount}`);
+
   let browser;
 
   try {
+    const inlineStart = Date.now();
     const inlinedHtml = await inlineExternalImages(html);
+    console.log(`[TIME: ${Date.now()}] [STEP 1.2] inlineExternalImages took ${Date.now() - inlineStart}ms`);
 
     browser = await launchBrowser();
     
     let page;
     try {
+      const newPageStart = Date.now();
       page = await browser.newPage();
-      console.log("[STEP 7] New page created");
+      console.log(`[TIME: ${Date.now()}] [STEP 7] New page created. Took ${Date.now() - newPageStart}ms`);
+
+      // Track ongoing requests
+      let activeRequests = 0;
+      page.on('request', (req) => {
+        activeRequests++;
+        console.log(`[NETWORK] Request started: ${req.url()}`);
+      });
+      page.on('requestfinished', (req) => {
+        activeRequests--;
+        console.log(`[NETWORK] Request finished: ${req.url()}`);
+      });
+      page.on('requestfailed', (req) => {
+        activeRequests--;
+        console.log(`[NETWORK] Request failed: ${req.url()} - ${req.failure()?.errorText}`);
+      });
+      
+      // We log active requests right before timeouts
+      page.on('error', err => console.log('[PAGE ERROR]', err));
+      
     } catch (err) {
-      console.error("[STEP 7 FAILED] browser.newPage() error:", err);
-      console.error(err.stack);
+      console.error(`[TIME: ${Date.now()}] [STEP 7 FAILED] browser.newPage() error:`, err);
       throw err;
     }
 
     try {
+      const contentStart = Date.now();
+      console.log(`[TIME: ${contentStart}] [STEP 8] page.setContent() started`);
+      // Changed from networkidle0 to domcontentloaded to prevent network hangs
+      // We will manually wait for fonts to load instead.
       await page.setContent(inlinedHtml, {
-        waitUntil: "networkidle0",
+        waitUntil: "domcontentloaded",
         timeout: 45000,
       });
-      console.log("[STEP 8] HTML loaded");
+      console.log(`[TIME: ${Date.now()}] [STEP 8] page.setContent() completed. Took ${Date.now() - contentStart}ms`);
+      
+      // Manually wait for fonts
+      const fontStart = Date.now();
+      await page.evaluateHandle('document.fonts.ready').catch(() => {});
+      console.log(`[TIME: ${Date.now()}] [STEP 8.1] Document fonts ready. Took ${Date.now() - fontStart}ms`);
+      
     } catch (err) {
-      console.error("[STEP 8 FAILED] page.setContent() error:", err);
-      console.error(err.stack);
+      console.error(`[TIME: ${Date.now()}] [STEP 8 FAILED] page.setContent() error:`, err);
       throw err;
     }
 
     let buffer;
     try {
+      const pdfStart = Date.now();
+      console.log(`[TIME: ${pdfStart}] [STEP 9] page.pdf() started`);
       buffer = await page.pdf({
         format: "A4",
         printBackground: true,
         margin: { top: "10mm", bottom: "10mm", left: "10mm", right: "10mm" },
+        timeout: 45000,
         ...pdfOptions,
       });
-      console.log("[STEP 9] PDF generated");
+      console.log(`[TIME: ${Date.now()}] [STEP 9] page.pdf() completed. Took ${Date.now() - pdfStart}ms`);
     } catch (err) {
-      console.error("[STEP 9 FAILED] page.pdf() error:", err);
-      console.error(err.stack);
+      console.error(`[TIME: ${Date.now()}] [STEP 9 FAILED] page.pdf() error:`, err);
       throw err;
     }
 
