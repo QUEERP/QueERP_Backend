@@ -5,6 +5,7 @@ const prisma = require("../config/prisma");
 
 
 //////////////////////////////////////////////////////
+
 exports.createAccount = async (req, res) => {
   try {
     const { name, type, code } = req.body;
