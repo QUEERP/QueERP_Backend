@@ -106,6 +106,21 @@ async function inlineExternalImages(html) {
  * @returns {Promise<import('puppeteer-core').Browser>}
  */
 async function launchBrowser() {
+  console.log("[STEP 4] Starting browser launch");
+  console.log("--- ENVIRONMENT DIAGNOSTICS ---");
+  console.log("process.platform:", process.platform);
+  console.log("process.version:", process.version);
+  console.log("process.env.VERCEL:", process.env.VERCEL);
+  console.log("process.env.NODE_ENV:", process.env.NODE_ENV);
+  try {
+    const pkg = require("../../package.json");
+    console.log("puppeteer-core version:", pkg.dependencies["puppeteer-core"]);
+    console.log("@sparticuz/chromium version:", pkg.dependencies["@sparticuz/chromium"]);
+  } catch (e) {
+    console.log("Could not read package.json version", e.message);
+  }
+  console.log("-------------------------------");
+
   const isLocal = process.platform === "win32" || process.env.NODE_ENV === "development";
   
   let executablePath;
@@ -130,21 +145,51 @@ async function launchBrowser() {
     }
   } else {
     // 3. Vercel Serverless / AWS Lambda
-    // Uses the embedded Brotli-compressed Chromium binary
-    executablePath = await chromium.executablePath();
+    try {
+      executablePath = await chromium.executablePath();
+      console.log("chromium.executablePath() succeeded.");
+    } catch (err) {
+      console.error("[STEP 5 FAILED] chromium.executablePath() error:", err);
+      console.error(err.stack);
+      throw err;
+    }
   }
 
-  console.log(`[Browser] Launching with executable: ${executablePath || 'default'}`);
+  console.log("[STEP 5] Chromium executable path:", executablePath || 'default');
+  
+  if (!isLocal) {
+    console.log("chromium.args:", chromium.args);
+    console.log("chromium.headless:", chromium.headless);
+  }
 
-  const browser = await puppeteer.launch({
-    executablePath: executablePath,
-    headless: isLocal ? true : chromium.headless,
-    args: isLocal ? puppeteer.defaultArgs() : chromium.args,
-    defaultViewport: chromium.defaultViewport,
-    timeout: 60000,
-  });
-
-  return browser;
+  try {
+    const browser = await puppeteer.launch({
+      executablePath: executablePath,
+      headless: isLocal ? true : chromium.headless,
+      args: isLocal ? puppeteer.defaultArgs() : chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      timeout: 60000,
+    });
+    console.log("[STEP 6] Browser launched successfully");
+    return browser;
+  } catch (err) {
+    console.error("[STEP 6 FAILED] Failed to launch browser process:", err);
+    console.error(err.stack);
+    
+    // Additional filesystem debug if Vercel
+    if (!isLocal && executablePath) {
+       const fs = require('fs');
+       if (!fs.existsSync(executablePath)) {
+         console.error(`FATAL: Executable does not exist at ${executablePath}`);
+       } else {
+         console.log(`Executable exists at ${executablePath}`);
+         const stats = fs.statSync(executablePath);
+         console.log(`Executable size: ${stats.size} bytes`);
+         console.log(`Executable permissions: ${stats.mode.toString(8)}`);
+       }
+    }
+    throw err;
+  }
 }
 
 /**
@@ -154,56 +199,71 @@ async function launchBrowser() {
  * @returns {Promise<Buffer>}
  */
 async function htmlToPdfBuffer(html, pdfOptions = {}) {
+  console.log("[STEP 2] HTML generated successfully");
+  console.log(`[STEP 3] HTML size: ${html.length} characters`);
   const start = Date.now();
   let browser;
 
   try {
-    // Step 1: Pre-inline all external images to avoid network hangs
     const inlinedHtml = await inlineExternalImages(html);
 
-    // Step 2: Launch browser
     browser = await launchBrowser();
-    const page = await browser.newPage();
+    
+    let page;
+    try {
+      page = await browser.newPage();
+      console.log("[STEP 7] New page created");
+    } catch (err) {
+      console.error("[STEP 7 FAILED] browser.newPage() error:", err);
+      console.error(err.stack);
+      throw err;
+    }
 
-    // Removed aggressive setRequestInterception(true) to allow web fonts to load
-    // natively on Vercel without blocking.
+    try {
+      await page.setContent(inlinedHtml, {
+        waitUntil: "networkidle0",
+        timeout: 45000,
+      });
+      console.log("[STEP 8] HTML loaded");
+    } catch (err) {
+      console.error("[STEP 8 FAILED] page.setContent() error:", err);
+      console.error(err.stack);
+      throw err;
+    }
 
-    // Step 3: Set content using networkidle0 to ensure fonts and layout complete
-    await page.setContent(inlinedHtml, {
-      waitUntil: "networkidle0",
-      timeout: 45000,
-    });
-
-    // Step 4: Generate PDF
-    const buffer = await page.pdf({
-      format: "A4",
-      printBackground: true,
-      margin: { top: "10mm", bottom: "10mm", left: "10mm", right: "10mm" },
-      ...pdfOptions,
-    });
+    let buffer;
+    try {
+      buffer = await page.pdf({
+        format: "A4",
+        printBackground: true,
+        margin: { top: "10mm", bottom: "10mm", left: "10mm", right: "10mm" },
+        ...pdfOptions,
+      });
+      console.log("[STEP 9] PDF generated");
+    } catch (err) {
+      console.error("[STEP 9 FAILED] page.pdf() error:", err);
+      console.error(err.stack);
+      throw err;
+    }
 
     const bufferObj = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
     const duration = Date.now() - start;
     console.log(`[PDF] Generated in ${duration}ms, size: ${bufferObj.length} bytes`);
 
-    // Sanity checks
     if (!bufferObj || bufferObj.length === 0) {
       throw new Error("PDF buffer is empty after generation");
     }
 
-    const header = bufferObj.toString("utf8", 0, 5);
-    if (header !== "%PDF-") {
-      throw new Error(`Invalid PDF header: "${header}". PDF generation failed.`);
-    }
-
     return bufferObj;
   } finally {
-    // Crucial: Always ensure the browser is closed to prevent TargetCloseError
-    // and zombie processes taking up memory in the Lambda container.
     if (browser) {
-      await browser.close().catch((e) =>
-        console.warn("[Browser] Close error:", e.message)
-      );
+      try {
+        await browser.close();
+        console.log("[STEP 10] Browser closed");
+      } catch (e) {
+        console.error("[STEP 10 FAILED] Browser close error:", e);
+        console.error(e.stack);
+      }
     }
   }
 }
