@@ -106,6 +106,12 @@ async function inlineExternalImages(html) {
  * @returns {Promise<import('puppeteer-core').Browser>}
  */
 async function launchBrowser() {
+  const launchStart = Date.now();
+  console.log(`[TIME: ${launchStart}] [STEP 4] Starting browser launch`);
+  console.log("--- ENVIRONMENT DIAGNOSTICS ---");
+  console.log("process.platform:", process.platform);
+  console.log("process.env.VERCEL:", process.env.VERCEL);
+
   const isLocal = process.platform === "win32" || process.env.NODE_ENV === "development";
   
   let executablePath;
@@ -130,21 +136,51 @@ async function launchBrowser() {
     }
   } else {
     // 3. Vercel Serverless / AWS Lambda
-    // Uses the embedded Brotli-compressed Chromium binary
-    executablePath = await chromium.executablePath();
+    try {
+      executablePath = await chromium.executablePath();
+      console.log("chromium.executablePath() succeeded.");
+    } catch (err) {
+      console.error("[STEP 5 FAILED] chromium.executablePath() error:", err);
+      console.error(err.stack);
+      throw err;
+    }
   }
 
-  console.log(`[Browser] Launching with executable: ${executablePath || 'default'}`);
+  console.log("[STEP 5] Chromium executable path:", executablePath || 'default');
+  
+  if (!isLocal) {
+    console.log("chromium.args:", chromium.args);
+    console.log("chromium.headless:", chromium.headless);
+  }
 
-  const browser = await puppeteer.launch({
-    executablePath: executablePath,
-    headless: isLocal ? true : chromium.headless,
-    args: isLocal ? puppeteer.defaultArgs() : chromium.args,
-    defaultViewport: chromium.defaultViewport,
-    timeout: 60000,
-  });
-
-  return browser;
+  try {
+    const browser = await puppeteer.launch({
+      executablePath: executablePath,
+      headless: isLocal ? true : chromium.headless,
+      args: isLocal ? puppeteer.defaultArgs() : chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      timeout: 60000,
+    });
+    console.log(`[TIME: ${Date.now()}] [STEP 6] Browser launched successfully. Took ${Date.now() - launchStart}ms`);
+    return browser;
+  } catch (err) {
+    console.error(`[TIME: ${Date.now()}] [STEP 6 FAILED] Took ${Date.now() - launchStart}ms. Error:`, err);
+    console.error(err.stack);
+    
+    // Additional filesystem debug if Vercel
+    if (!isLocal && executablePath) {
+       const fs = require('fs');
+       if (!fs.existsSync(executablePath)) {
+         console.error(`FATAL: Executable does not exist at ${executablePath}`);
+       } else {
+         console.log(`Executable exists at ${executablePath}`);
+         const stats = fs.statSync(executablePath);
+         console.log(`Executable size: ${stats.size} bytes`);
+         console.log(`Executable permissions: ${stats.mode.toString(8)}`);
+       }
+    }
+    throw err;
+  }
 }
 
 /**
@@ -154,56 +190,111 @@ async function launchBrowser() {
  * @returns {Promise<Buffer>}
  */
 async function htmlToPdfBuffer(html, pdfOptions = {}) {
-  const start = Date.now();
+  const globalStart = Date.now();
+  console.log(`[TIME: ${globalStart}] [STEP 1] HTML generated`);
+  console.log(`[STEP 1.1] HTML size: ${(html.length / 1024).toFixed(2)} KB`);
+
+  // Simple counters for diagnostic logs
+  const imgCount = (html.match(/<img/g) || []).length;
+  const extImgCount = (html.match(/src=["'](https?:\/\/[^"']+)["']/g) || []).length;
+  const fontCount = (html.match(/@font-face/g) || []).length;
+  const extCssCount = (html.match(/<link[^>]+rel=["']stylesheet["']/g) || []).length;
+  console.log(`[DIAGNOSTICS] Images: ${imgCount} (External: ${extImgCount}), Fonts: ${fontCount}, CSS files: ${extCssCount}`);
+
   let browser;
 
   try {
-    // Step 1: Pre-inline all external images to avoid network hangs
+    const inlineStart = Date.now();
     const inlinedHtml = await inlineExternalImages(html);
+    console.log(`[TIME: ${Date.now()}] [STEP 1.2] inlineExternalImages took ${Date.now() - inlineStart}ms`);
 
-    // Step 2: Launch browser
     browser = await launchBrowser();
-    const page = await browser.newPage();
+    
+    let page;
+    try {
+      const newPageStart = Date.now();
+      page = await browser.newPage();
+      console.log(`[TIME: ${Date.now()}] [STEP 7] New page created. Took ${Date.now() - newPageStart}ms`);
 
-    // Removed aggressive setRequestInterception(true) to allow web fonts to load
-    // natively on Vercel without blocking.
+      // Track ongoing requests
+      let activeRequests = 0;
+      page.on('request', (req) => {
+        activeRequests++;
+        console.log(`[NETWORK] Request started: ${req.url()}`);
+      });
+      page.on('requestfinished', (req) => {
+        activeRequests--;
+        console.log(`[NETWORK] Request finished: ${req.url()}`);
+      });
+      page.on('requestfailed', (req) => {
+        activeRequests--;
+        console.log(`[NETWORK] Request failed: ${req.url()} - ${req.failure()?.errorText}`);
+      });
+      
+      // We log active requests right before timeouts
+      page.on('error', err => console.log('[PAGE ERROR]', err));
+      
+    } catch (err) {
+      console.error(`[TIME: ${Date.now()}] [STEP 7 FAILED] browser.newPage() error:`, err);
+      throw err;
+    }
 
-    // Step 3: Set content using networkidle0 to ensure fonts and layout complete
-    await page.setContent(inlinedHtml, {
-      waitUntil: "networkidle0",
-      timeout: 45000,
-    });
+    try {
+      const contentStart = Date.now();
+      console.log(`[TIME: ${contentStart}] [STEP 8] page.setContent() started`);
+      // Changed from networkidle0 to domcontentloaded to prevent network hangs
+      // We will manually wait for fonts to load instead.
+      await page.setContent(inlinedHtml, {
+        waitUntil: "domcontentloaded",
+        timeout: 45000,
+      });
+      console.log(`[TIME: ${Date.now()}] [STEP 8] page.setContent() completed. Took ${Date.now() - contentStart}ms`);
+      
+      // Manually wait for fonts
+      const fontStart = Date.now();
+      await page.evaluateHandle('document.fonts.ready').catch(() => {});
+      console.log(`[TIME: ${Date.now()}] [STEP 8.1] Document fonts ready. Took ${Date.now() - fontStart}ms`);
+      
+    } catch (err) {
+      console.error(`[TIME: ${Date.now()}] [STEP 8 FAILED] page.setContent() error:`, err);
+      throw err;
+    }
 
-    // Step 4: Generate PDF
-    const buffer = await page.pdf({
-      format: "A4",
-      printBackground: true,
-      margin: { top: "10mm", bottom: "10mm", left: "10mm", right: "10mm" },
-      ...pdfOptions,
-    });
+    let buffer;
+    try {
+      const pdfStart = Date.now();
+      console.log(`[TIME: ${pdfStart}] [STEP 9] page.pdf() started`);
+      buffer = await page.pdf({
+        format: "A4",
+        printBackground: true,
+        margin: { top: "10mm", bottom: "10mm", left: "10mm", right: "10mm" },
+        timeout: 45000,
+        ...pdfOptions,
+      });
+      console.log(`[TIME: ${Date.now()}] [STEP 9] page.pdf() completed. Took ${Date.now() - pdfStart}ms`);
+    } catch (err) {
+      console.error(`[TIME: ${Date.now()}] [STEP 9 FAILED] page.pdf() error:`, err);
+      throw err;
+    }
 
     const bufferObj = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
     const duration = Date.now() - start;
     console.log(`[PDF] Generated in ${duration}ms, size: ${bufferObj.length} bytes`);
 
-    // Sanity checks
     if (!bufferObj || bufferObj.length === 0) {
       throw new Error("PDF buffer is empty after generation");
     }
 
-    const header = bufferObj.toString("utf8", 0, 5);
-    if (header !== "%PDF-") {
-      throw new Error(`Invalid PDF header: "${header}". PDF generation failed.`);
-    }
-
     return bufferObj;
   } finally {
-    // Crucial: Always ensure the browser is closed to prevent TargetCloseError
-    // and zombie processes taking up memory in the Lambda container.
     if (browser) {
-      await browser.close().catch((e) =>
-        console.warn("[Browser] Close error:", e.message)
-      );
+      try {
+        await browser.close();
+        console.log("[STEP 10] Browser closed");
+      } catch (e) {
+        console.error("[STEP 10 FAILED] Browser close error:", e);
+        console.error(e.stack);
+      }
     }
   }
 }
