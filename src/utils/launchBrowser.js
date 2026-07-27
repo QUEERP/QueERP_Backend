@@ -1,56 +1,15 @@
 /**
  * launchBrowser.js
  * Centralized Puppeteer browser launcher.
- * Handles both local (Windows/Linux) and production (Lambda/serverless) environments.
+ * Handles both local (Windows/Linux) and production (Vercel Serverless) environments.
  */
 
 const puppeteer = require("puppeteer-core");
 const https = require("https");
 const http = require("http");
 
-const CHROME_ARGS = [
-  "--no-sandbox",
-  "--disable-setuid-sandbox",
-  "--disable-dev-shm-usage",
-  "--disable-gpu",
-  "--hide-scrollbars",
-  "--disable-web-security",
-  "--font-render-hinting=none",
-  "--disable-extensions",
-  "--disable-background-networking",
-  "--disable-default-apps",
-  "--disable-sync",
-  "--no-first-run",
-  "--disable-features=VizDisplayCompositor",
-];
-
-async function getExecPath() {
-  // 1. Explicit override (e.g. set in .env for local dev)
-  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
-    return process.env.PUPPETEER_EXECUTABLE_PATH;
-  }
-
-  // 2. Windows default Chrome path
-  if (process.platform === "win32") {
-    const fs = require("fs");
-    const winPaths = [
-      "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-      "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
-    ];
-    for (const p of winPaths) {
-      if (fs.existsSync(p)) return p;
-    }
-  }
-
-  // 3. Serverless / Lambda — use @sparticuz/chromium-min with remote tarball
-  // NOTE: @sparticuz/chromium-min is an ES Module, so it MUST be loaded via
-  // dynamic import() here, not require() at the top of the file. require()-ing
-  // it at module load time crashes the entire server on boot (ERR_REQUIRE_ESM).
-  const { default: chromium } = await import("@sparticuz/chromium-min");
-  return await chromium.executablePath(
-    "https://github.com/Sparticuz/chromium/releases/download/v121.0.0/chromium-v121.0.0-pack.tar"
-  );
-}
+// Sparticuz chromium provides optimal defaults for AWS Lambda / Vercel
+const chromium = require("@sparticuz/chromium");
 
 /**
  * Fetch a URL and return it as a base64 data URI.
@@ -102,8 +61,7 @@ async function urlToBase64(url) {
 
 /**
  * Pre-fetch all external image URLs in the HTML and replace them with inline base64.
- * This prevents Puppeteer from making external HTTP requests during rendering,
- * which is the root cause of waitUntil: networkidle0 timeouts.
+ * This prevents Puppeteer from waiting on image networks during PDF rendering.
  * @param {string} html
  * @returns {Promise<string>}
  */
@@ -144,19 +102,45 @@ async function inlineExternalImages(html) {
 }
 
 /**
- * Launch a Puppeteer browser instance.
- * Always call browser.close() in a finally block.
- * @returns {Promise<Browser>}
+ * Launch a Puppeteer browser instance optimized for Vercel/AWS Lambda.
+ * @returns {Promise<import('puppeteer-core').Browser>}
  */
 async function launchBrowser() {
-  const execPath = await getExecPath();
-  console.log(`[Browser] Using Chrome at: ${execPath}`);
+  const isLocal = process.platform === "win32" || process.env.NODE_ENV === "development";
+  
+  let executablePath;
+  
+  if (isLocal) {
+    // 1. Explicit override for local dev
+    if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+      executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+    } else if (process.platform === "win32") {
+      // 2. Windows default paths
+      const fs = require("fs");
+      const winPaths = [
+        "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+        "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+      ];
+      for (const p of winPaths) {
+        if (fs.existsSync(p)) {
+          executablePath = p;
+          break;
+        }
+      }
+    }
+  } else {
+    // 3. Vercel Serverless / AWS Lambda
+    // Uses the embedded Brotli-compressed Chromium binary
+    executablePath = await chromium.executablePath();
+  }
+
+  console.log(`[Browser] Launching with executable: ${executablePath || 'default'}`);
 
   const browser = await puppeteer.launch({
-    executablePath: execPath,
-    headless: "new",
-    args: CHROME_ARGS,
-    defaultViewport: { width: 1200, height: 1600 },
+    executablePath: executablePath,
+    headless: isLocal ? true : chromium.headless,
+    args: isLocal ? puppeteer.defaultArgs() : chromium.args,
+    defaultViewport: chromium.defaultViewport,
     timeout: 60000,
   });
 
@@ -165,8 +149,6 @@ async function launchBrowser() {
 
 /**
  * Generate a PDF Buffer from an HTML string.
- * - Pre-inlines all external images as base64 to avoid network timeouts.
- * - Uses domcontentloaded instead of networkidle0 for speed and reliability.
  * @param {string} html - HTML content to render
  * @param {object} [pdfOptions] - Puppeteer PDF options
  * @returns {Promise<Buffer>}
@@ -176,42 +158,21 @@ async function htmlToPdfBuffer(html, pdfOptions = {}) {
   let browser;
 
   try {
-    // Step 1: Pre-inline all external images to avoid network timeouts
+    // Step 1: Pre-inline all external images to avoid network hangs
     const inlinedHtml = await inlineExternalImages(html);
 
     // Step 2: Launch browser
     browser = await launchBrowser();
     const page = await browser.newPage();
 
-    // Block ALL external network requests during rendering
-    // (images are already inlined, so nothing external is needed)
-    await page.setRequestInterception(true);
-    page.on("request", (req) => {
-      const url = req.url();
-      const resourceType = req.resourceType();
+    // Removed aggressive setRequestInterception(true) to allow web fonts to load
+    // natively on Vercel without blocking.
 
-      // Allow data URIs (our inlined base64 images)
-      if (url.startsWith("data:")) {
-        return req.continue();
-      }
-
-      // Block all external HTTP requests — they cause networkidle0 timeouts
-      if (url.startsWith("http://") || url.startsWith("https://")) {
-        return req.abort();
-      }
-
-      req.continue();
-    });
-
-    // Step 3: Set content using domcontentloaded — fast and reliable
-    // We don't need networkidle0 because all images are inlined
+    // Step 3: Set content using networkidle0 to ensure fonts and layout complete
     await page.setContent(inlinedHtml, {
-      waitUntil: "domcontentloaded",
-      timeout: 30000,
+      waitUntil: "networkidle0",
+      timeout: 45000,
     });
-
-    // Small delay to ensure layout is complete (fonts, CSS calculations)
-    await new Promise((r) => setTimeout(r, 500));
 
     // Step 4: Generate PDF
     const buffer = await page.pdf({
@@ -237,6 +198,8 @@ async function htmlToPdfBuffer(html, pdfOptions = {}) {
 
     return bufferObj;
   } finally {
+    // Crucial: Always ensure the browser is closed to prevent TargetCloseError
+    // and zombie processes taking up memory in the Lambda container.
     if (browser) {
       await browser.close().catch((e) =>
         console.warn("[Browser] Close error:", e.message)
