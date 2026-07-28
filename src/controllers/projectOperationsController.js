@@ -313,12 +313,12 @@ exports.createProject = async (req, res) => {
     }
 
     const projCount = await prisma.project.count({ where: { businessId: req.business.id } });
-    const projectCode = `PRJ-${String(projCount + 1).padStart(5, '0')}`;
+    const projectCode = `PRJ-${String(projCount + 1).padStart(3, '0')}`;
 
     const project = await prisma.project.create({
       data: {
         ...data,
-        projectCode,
+        projectCode: data.projectCode || projectCode,
         executionType: executionType || "SERVICE",
         businessId: req.business.id,
       },
@@ -387,6 +387,18 @@ exports.updateProject = async (req, res) => {
     res.json({ success: true, project });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+exports.deleteProject = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await prisma.project.delete({
+      where: { id, businessId: req.business.id }
+    });
+    res.json({ success: true, message: "Project deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 

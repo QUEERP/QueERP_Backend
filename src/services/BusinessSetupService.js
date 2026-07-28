@@ -34,6 +34,7 @@ class BusinessSetupService {
       const newBusiness = await tx.business.create({
         data: {
           name,
+          country: countryInfo ? (countryInfo.code === 'AE' ? 'UAE' : (countryInfo.code === 'IN' ? 'INDIA' : countryInfo.name.toUpperCase())) : 'INDIA',
           countryCode: countryCode,
           currencyCode: currencyCode,
           currencySymbol: currencySymbol,

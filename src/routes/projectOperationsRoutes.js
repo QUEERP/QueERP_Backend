@@ -88,6 +88,7 @@ router.post("/", Controller.createProject);
 router.get("/", Controller.getProjects);
 router.get("/:id", Controller.getProjectDetails);
 router.put("/:id", Controller.updateProject);
+router.delete("/:id", Controller.deleteProject);
 
 // Global Tasks & Milestones
 router.get("/global/tasks", Controller.getGlobalTasks);

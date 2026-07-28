@@ -53,7 +53,7 @@ model Business {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
 
-  country            Country   @default(INDIA)
+  country            String?   @default("INDIA")
   state              String?
   city               String?
   currency           String?
@@ -3046,11 +3046,6 @@ model InventoryLayer {
   @@map("inventory_layers")
 }
 
-enum Country {
-  INDIA
-  UAE
-}
-
 enum TaxTreatment {
   DOMESTIC
   INTERSTATE
@@ -3335,6 +3330,8 @@ model Project {
   executionType String? @default("SERVICE") // SERVICE, PRODUCT, HYBRID
   billingMethod String?
   templateId    String?
+
+  notes String? @db.Text
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
